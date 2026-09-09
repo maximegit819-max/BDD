@@ -69,19 +69,45 @@ st.divider()
 
 # --- 1. Fiche d'Identité ---
 st.subheader("Fiche d'Identité")
+
+is_index = asset_info.get('asset_type') == 'INDEX' or pd.notna(asset_info.get('issuer'))
+
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Nom", str(asset_info['name'])[:25])
+    st.metric("Nom", str(asset_info['name'])[:40])
     st.metric("Ticker Bloomberg", str(asset_info.get('ticker_bloomberg', 'N/A')))
 with col2:
     st.metric("Type", str(asset_info.get('asset_type', 'N/A')))
     st.metric("ISIN", str(asset_info.get('isin', 'N/A')))
 with col3:
-    st.metric("Secteur", str(asset_info.get('sector', 'N/A')))
+    st.metric("Thème / Secteur", str(asset_info.get('sector', 'N/A')))
     st.metric("Sous Type", str(asset_info.get('asset_subtype', 'N/A')))
 with col4:
     st.metric("Pays", str(asset_info.get('country', 'N/A')))
     st.metric("Devise", str(asset_info.get('currency', 'N/A')))
+
+if is_index and pd.notna(asset_info.get('issuer')):
+    st.markdown("---")
+    st.markdown("**📋 Caractéristiques de l'Indice (Run Hebdo)**")
+    idx_col1, idx_col2, idx_col3, idx_col4 = st.columns(4)
+    with idx_col1:
+        st.metric("Émetteur", str(asset_info.get('issuer', 'N/A')))
+        st.metric("Sous Secteur", str(asset_info.get('sub_sector', 'N/A')))
+    with idx_col2:
+        div_val = asset_info.get('dividend_yield')
+        div_str = f"{float(div_val)*100:.2f} %" if pd.notna(div_val) and div_val is not None else "N/A"
+        st.metric("Rendement Dividende", div_str)
+        
+        comp_count = asset_info.get('components_count')
+        comp_str = str(int(comp_count)) if pd.notna(comp_count) and comp_count is not None else "N/A"
+        st.metric("Composants", comp_str)
+    with idx_col3:
+        st.markdown("**Construction**")
+        st.caption(str(asset_info.get('construction', 'N/A')))
+    with idx_col4:
+        st.markdown("**Spécificités**")
+        st.caption(str(asset_info.get('specificities', 'N/A')))
+
 
 st.divider()
 
