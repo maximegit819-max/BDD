@@ -184,10 +184,18 @@ st.divider()
 # --- 4. Analyse des Corrélations (1 an glissant) ---
 st.subheader("Corrélations sur 1 An Glissant")
 
-correl_type = st.selectbox(
-    "Filtrez l'univers de comparaison :",
-    options=["Tous", "INDEX", "EQUITY", "COMMODITY", "CURRENCY"]
-)
+# Extraction des valeurs uniques pour les filtres
+subtypes = sorted([str(x) for x in assets_df['asset_subtype'].dropna().unique()])
+sectors = sorted([str(x) for x in assets_df['sector'].dropna().unique()])
+countries = sorted([str(x) for x in assets_df['country'].dropna().unique()])
+
+col_f1, col_f2, col_f3 = st.columns(3)
+with col_f1:
+    filter_subtype = st.multiselect("Filtre Sous Type (vide = Tous) :", options=subtypes)
+with col_f2:
+    filter_sector = st.multiselect("Filtre Secteur (vide = Tous) :", options=sectors)
+with col_f3:
+    filter_country = st.multiselect("Filtre Pays (vide = Tous) :", options=countries)
 
 with st.spinner("Calcul des corrélations en cours..."):
     # 1 an glissant
@@ -195,14 +203,22 @@ with st.spinner("Calcul des corrélations en cours..."):
     prices_1y = prices_pivot[prices_pivot.index >= one_year_ago]
     
     # Filtrage de l'univers
-    if correl_type != "Tous":
-        valid_ids = assets_df[assets_df['asset_type'] == correl_type]['asset_id'].tolist()
-        # On garde toujours l'actif sélectionné dans le calcul, même s'il n'est pas du type filtré
-        if selected_asset_id not in valid_ids:
-            valid_ids.append(selected_asset_id)
-        # Intersection avec les colonnes existantes
-        valid_ids = [vid for vid in valid_ids if vid in prices_1y.columns]
-        prices_1y = prices_1y[valid_ids]
+    mask = pd.Series(True, index=assets_df.index)
+    if len(filter_subtype) > 0:
+        mask = mask & (assets_df['asset_subtype'].isin(filter_subtype))
+    if len(filter_sector) > 0:
+        mask = mask & (assets_df['sector'].isin(filter_sector))
+    if len(filter_country) > 0:
+        mask = mask & (assets_df['country'].isin(filter_country))
+        
+    valid_ids = assets_df[mask]['asset_id'].tolist()
+    
+    # On garde toujours l'actif sélectionné dans le calcul, même s'il n'est pas du type filtré
+    if selected_asset_id not in valid_ids:
+        valid_ids.append(selected_asset_id)
+    # Intersection avec les colonnes existantes
+    valid_ids = [vid for vid in valid_ids if vid in prices_1y.columns]
+    prices_1y = prices_1y[valid_ids]
     
     # Calcul des corrélations
     returns_1y = prices_1y.pct_change(fill_method=None).dropna(how='all')
