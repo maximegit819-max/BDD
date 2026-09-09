@@ -88,7 +88,7 @@ with col4:
 
 if is_index and pd.notna(asset_info.get('issuer')):
     st.markdown("---")
-    st.markdown("**📋 Caractéristiques de l'Indice (Run Hebdo)**")
+    st.markdown("**Caractéristiques de l'Indice (Run Hebdo)**")
     idx_col1, idx_col2, idx_col3, idx_col4 = st.columns(4)
     with idx_col1:
         st.metric("Émetteur", str(asset_info.get('issuer', 'N/A')))
@@ -96,17 +96,17 @@ if is_index and pd.notna(asset_info.get('issuer')):
     with idx_col2:
         div_val = asset_info.get('dividend_yield')
         div_str = f"{float(div_val)*100:.2f} %" if pd.notna(div_val) and div_val is not None else "N/A"
-        st.metric("Rendement Dividende", div_str)
+        st.metric("Dividende distribué en 2025 avec effet de réinvestissement", div_str)
         
         comp_count = asset_info.get('components_count')
         comp_str = str(int(comp_count)) if pd.notna(comp_count) and comp_count is not None else "N/A"
         st.metric("Composants", comp_str)
     with idx_col3:
         st.markdown("**Construction**")
-        st.caption(str(asset_info.get('construction', 'N/A')))
+        st.write(str(asset_info.get('construction', 'N/A')))
     with idx_col4:
         st.markdown("**Spécificités**")
-        st.caption(str(asset_info.get('specificities', 'N/A')))
+        st.write(str(asset_info.get('specificities', 'N/A')))
 
 
 st.divider()
