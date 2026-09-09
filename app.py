@@ -78,7 +78,7 @@ with col2:
     st.metric("ISIN", str(asset_info.get('isin', 'N/A')))
 with col3:
     st.metric("Secteur", str(asset_info.get('sector', 'N/A')))
-    st.metric("Industrie", str(asset_info.get('industry', 'N/A')))
+    st.metric("Sous Type", str(asset_info.get('asset_subtype', 'N/A')))
 with col4:
     st.metric("Pays", str(asset_info.get('country', 'N/A')))
     st.metric("Devise", str(asset_info.get('currency', 'N/A')))
@@ -86,9 +86,13 @@ with col4:
 st.divider()
 
 # --- Préparation des séries de prix pour l'actif ---
+if selected_asset_id not in prices_pivot.columns:
+    st.warning("⚠️ Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
+    st.stop()
+
 asset_prices = prices_pivot[selected_asset_id].dropna()
 if len(asset_prices) == 0:
-    st.error("Aucun historique de prix disponible pour cet actif.")
+    st.warning("⚠️ Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
     st.stop()
 
 daily_returns = asset_prices.pct_change(fill_method=None).dropna()
