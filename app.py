@@ -87,12 +87,12 @@ st.divider()
 
 # --- Préparation des séries de prix pour l'actif ---
 if selected_asset_id not in prices_pivot.columns:
-    st.warning("⚠️ Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
+    st.warning("Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
     st.stop()
 
 asset_prices = prices_pivot[selected_asset_id].dropna()
 if len(asset_prices) == 0:
-    st.warning("⚠️ Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
+    st.warning("Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
     st.stop()
 
 daily_returns = asset_prices.pct_change(fill_method=None).dropna()
@@ -191,11 +191,11 @@ countries = sorted([str(x) for x in assets_df['country'].dropna().unique()])
 
 col_f1, col_f2, col_f3 = st.columns(3)
 with col_f1:
-    filter_subtype = st.multiselect("Filtre Sous Type (vide = Tous) :", options=subtypes)
+    filter_subtype = st.multiselect("Filtre Sous Type", options=subtypes)
 with col_f2:
-    filter_sector = st.multiselect("Filtre Secteur (vide = Tous) :", options=sectors)
+    filter_sector = st.multiselect("Filtre Secteur", options=sectors)
 with col_f3:
-    filter_country = st.multiselect("Filtre Pays (vide = Tous) :", options=countries)
+    filter_country = st.multiselect("Filtre Pays", options=countries)
 
 with st.spinner("Calcul des corrélations en cours..."):
     # 1 an glissant
