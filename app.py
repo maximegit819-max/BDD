@@ -225,10 +225,10 @@ with st.spinner("Calcul des corrélations en cours..."):
             col_top, col_bottom = st.columns(2)
             with col_top:
                 st.success("Les plus corrélés")
-                st.dataframe(top_10.style.format({'Correlation': "{:.2f}"}), use_container_width=True, hide_index=True)
+                st.dataframe(top_10.style.format({'Correlation': "{:.4f}"}), use_container_width=True, hide_index=True)
             with col_bottom:
                 st.error("Les moins corrélés")
-                st.dataframe(bottom_10.style.format({'Correlation': "{:.2f}"}), use_container_width=True, hide_index=True)
+                st.dataframe(bottom_10.style.format({'Correlation': "{:.4f}"}), use_container_width=True, hide_index=True)
         else:
             st.info("Pas assez de données pour calculer les corrélations sur cet univers.")
     else:
