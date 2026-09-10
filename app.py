@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import datetime
 
 # 1. Configuration
-st.set_page_config(page_title="Asset 360", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="Asset 360", layout="wide")
 
 @st.cache_resource
 def init_connection():
@@ -193,15 +193,71 @@ with col_vol:
 st.divider()
 
 # --- 3. Graphique Technique ---
-st.subheader("Moyennes Mobiles")
+st.subheader("Cours")
 
-sma50 = asset_prices.rolling(window=50, min_periods=1).mean()
-sma200 = asset_prices.rolling(window=200, min_periods=1).mean()
+# Mapping Benchmark
+benchmark_mapping = {
+    'FRANCE': 'CAC Index', 'France': 'CAC Index',
+    'GERMANY': 'DAX Index', 'ALLEMAGNE': 'DAX Index', 'Allemagne': 'DAX Index',
+    'US': 'SPX Index', 'USA': 'SPX Index', 'UNITED STATES': 'SPX Index', 'Amérique du Nord': 'SPX Index',
+    'BRITAIN': 'UKX Index',
+    'SWITZERLAND': 'SMI Index',
+    'JAPAN': 'NKY Index', 'Japon': 'NKY Index', 'Japon ': 'NKY Index',
+    'CHINE': 'SHSZ300 INDEX', 'Chine': 'SHSZ300 INDEX', 'CHINA': 'SHSZ300 INDEX',
+    'HONG KONG': 'HSI Index', 'MACAU': 'HSI Index',
+    # Europe élargie -> Euro Stoxx 50
+    'EUROPE': 'SX5E Index', 'EURO ZONE': 'SX5E Index', 'ZONE EURO': 'SX5E Index', 'Europe': 'SX5E Index',
+    'ITALY': 'SX5E Index', 'SPAIN': 'SX5E Index', 'PORTUGAL': 'SX5E Index', 'MALTA': 'SX5E Index',
+    'BELGIQUE': 'SX5E Index', 'BELGIUM': 'SX5E Index', 'NETHERLANDS': 'SX5E Index', 'LUXEMBOURG': 'SX5E Index',
+    'SWEDEN': 'SX5E Index', 'DENMARK': 'SX5E Index', 'NORWAY': 'SX5E Index', 'FINLAND': 'SX5E Index',
+    'FAROE ISLANDS': 'SX5E Index', 'AUSTRIA': 'SX5E Index', 'CZECH': 'SX5E Index', 'POLAND': 'SX5E Index',
+    'HUNGARY': 'SX5E Index', 'IRELAND': 'SX5E Index'
+}
+
+asset_country = str(asset_info.get('country', '')).strip()
+benchmark_ticker = benchmark_mapping.get(asset_country)
+benchmark_asset_id = None
+
+if benchmark_ticker:
+    bench_match = assets_df[assets_df['ticker_bloomberg'] == benchmark_ticker]
+    if not bench_match.empty:
+        benchmark_asset_id = bench_match.iloc[0]['asset_id']
+
+show_base_100 = False
+if benchmark_asset_id and benchmark_asset_id in prices_pivot.columns:
+    show_base_100 = st.checkbox(f"Afficher la comparaison avec le Benchmark {benchmark_ticker} (Base 100)", value=True)
 
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=asset_prices.index, y=asset_prices, mode='lines', name='Prix', line=dict(width=2)))
-fig.add_trace(go.Scatter(x=sma50.index, y=sma50, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
-fig.add_trace(go.Scatter(x=sma200.index, y=sma200, mode='lines', name='SMA 200', line=dict(color='#ff512f', width=1.5)))
+
+if show_base_100:
+    bench_prices = prices_pivot[benchmark_asset_id].dropna()
+    start_date = asset_prices.index[0]
+    
+    asset_norm = (asset_prices / asset_prices.iloc[0]) * 100
+    
+    bench_sub = bench_prices[bench_prices.index >= start_date]
+    if not bench_sub.empty:
+        bench_norm = (bench_sub / bench_sub.iloc[0]) * 100
+        fig.add_trace(go.Scatter(
+            x=bench_norm.index, y=bench_norm, mode='lines', 
+            name=f'Benchmark ({benchmark_ticker})', 
+            line=dict(color='gray', width=1.5, dash='dot')
+        ))
+    
+    sma50 = asset_norm.rolling(window=50, min_periods=1).mean()
+    sma200 = asset_norm.rolling(window=200, min_periods=1).mean()
+    
+    fig.add_trace(go.Scatter(x=asset_norm.index, y=asset_norm, mode='lines', name='Prix (Base 100)', line=dict(width=2)))
+    fig.add_trace(go.Scatter(x=sma50.index, y=sma50, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
+    fig.add_trace(go.Scatter(x=sma200.index, y=sma200, mode='lines', name='SMA 200', line=dict(color='#ff512f', width=1.5)))
+else:
+    sma50 = asset_prices.rolling(window=50, min_periods=1).mean()
+    sma200 = asset_prices.rolling(window=200, min_periods=1).mean()
+    
+    fig.add_trace(go.Scatter(x=asset_prices.index, y=asset_prices, mode='lines', name='Prix', line=dict(width=2)))
+    fig.add_trace(go.Scatter(x=sma50.index, y=sma50, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
+    fig.add_trace(go.Scatter(x=sma200.index, y=sma200, mode='lines', name='SMA 200', line=dict(color='#ff512f', width=1.5)))
+
 fig.update_layout(hovermode="x unified", height=500, margin=dict(l=0, r=0, t=30, b=0))
 st.plotly_chart(fig, use_container_width=True)
 
