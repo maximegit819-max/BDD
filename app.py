@@ -117,8 +117,9 @@ if selected_asset_id not in prices_pivot.columns:
     st.stop()
 
 asset_prices = prices_pivot[selected_asset_id].dropna()
+asset_prices = asset_prices[asset_prices > 0] # Ignorer les prix à 0 pour éviter les bugs mathématiques
 if len(asset_prices) == 0:
-    st.warning("Aucun historique de prix disponible pour cet actif (base de données vide pour ce ticker).")
+    st.warning("Aucun historique de prix valide (non nul) disponible pour cet actif.")
     st.stop()
 
 daily_returns = asset_prices.pct_change(fill_method=None).dropna()
@@ -259,6 +260,7 @@ fig = go.Figure()
 
 if show_base_100:
     bench_prices = prices_pivot[benchmark_asset_id].dropna()
+    bench_prices = bench_prices[bench_prices > 0] # Ignorer les prix à 0
     start_date = asset_prices.index[0]
     
     asset_norm = (asset_prices / asset_prices.iloc[0]) * 100
