@@ -252,22 +252,24 @@ if benchmark_ticker:
     if not bench_match.empty:
         benchmark_asset_id = bench_match.iloc[0]['asset_id']
 
-show_base_100 = False
+show_benchmark = False
 if benchmark_asset_id and benchmark_asset_id in prices_pivot.columns:
-    show_base_100 = st.checkbox(f"Afficher la comparaison avec le Benchmark {benchmark_ticker} (Base 100)", value=True)
+    show_benchmark = st.checkbox(f"Afficher la comparaison avec le Benchmark {benchmark_ticker} (Rebasé sur le prix de l'actif)", value=True)
 
 fig = go.Figure()
 
-if show_base_100:
+if show_benchmark:
     bench_prices = prices_pivot[benchmark_asset_id].dropna()
     bench_prices = bench_prices[bench_prices > 0] # Ignorer les prix à 0
     start_date = asset_prices.index[0]
     
-    asset_norm = (asset_prices / asset_prices.iloc[0]) * 100
+    # On garde le vrai prix de l'actif
+    asset_norm = asset_prices
     
     bench_sub = bench_prices[bench_prices.index >= start_date]
     if not bench_sub.empty:
-        bench_norm = (bench_sub / bench_sub.iloc[0]) * 100
+        # On rebase le benchmark pour qu'il démarre exactement au même prix que l'actif
+        bench_norm = (bench_sub / bench_sub.iloc[0]) * asset_prices.iloc[0]
         fig.add_trace(go.Scatter(
             x=bench_norm.index, y=bench_norm, mode='lines', 
             name=f'Benchmark ({benchmark_ticker})', 
@@ -277,7 +279,7 @@ if show_base_100:
     sma50 = asset_norm.rolling(window=50, min_periods=1).mean()
     sma200 = asset_norm.rolling(window=200, min_periods=1).mean()
     
-    fig.add_trace(go.Scatter(x=asset_norm.index, y=asset_norm, mode='lines', name='Prix (Base 100)', line=dict(width=2)))
+    fig.add_trace(go.Scatter(x=asset_norm.index, y=asset_norm, mode='lines', name='Prix', line=dict(width=2)))
     fig.add_trace(go.Scatter(x=sma50.index, y=sma50, mode='lines', name='SMA 50', line=dict(color='#00d2ff', width=1.5)))
     fig.add_trace(go.Scatter(x=sma200.index, y=sma200, mode='lines', name='SMA 200', line=dict(color='#ff512f', width=1.5)))
 else:
