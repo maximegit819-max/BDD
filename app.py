@@ -261,15 +261,19 @@ fig = go.Figure()
 if show_benchmark:
     bench_prices = prices_pivot[benchmark_asset_id].dropna()
     bench_prices = bench_prices[bench_prices > 0] # Ignorer les prix à 0
-    start_date = asset_prices.index[0]
     
     # On garde le vrai prix de l'actif
     asset_norm = asset_prices
     
-    bench_sub = bench_prices[bench_prices.index >= start_date]
-    if not bench_sub.empty:
-        # On rebase le benchmark pour qu'il démarre exactement au même prix que l'actif
-        bench_norm = (bench_sub / bench_sub.iloc[0]) * asset_prices.iloc[0]
+    # On trouve la première date commune pour rebaser proprement
+    common_dates = asset_prices.index.intersection(bench_prices.index)
+    if len(common_dates) > 0:
+        first_common = common_dates[0]
+        bench_sub = bench_prices[bench_prices.index >= first_common]
+        
+        # Le benchmark prend la valeur exacte de l'actif à cette première date commune
+        bench_norm = (bench_sub / bench_prices.loc[first_common]) * asset_prices.loc[first_common]
+        
         fig.add_trace(go.Scatter(
             x=bench_norm.index, y=bench_norm, mode='lines', 
             name=f'Benchmark ({benchmark_ticker})', 
