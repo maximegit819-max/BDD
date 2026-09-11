@@ -211,7 +211,35 @@ benchmark_mapping = {
     'BELGIQUE': 'SX5E Index', 'BELGIUM': 'SX5E Index', 'NETHERLANDS': 'SX5E Index', 'LUXEMBOURG': 'SX5E Index',
     'SWEDEN': 'SX5E Index', 'DENMARK': 'SX5E Index', 'NORWAY': 'SX5E Index', 'FINLAND': 'SX5E Index',
     'FAROE ISLANDS': 'SX5E Index', 'AUSTRIA': 'SX5E Index', 'CZECH': 'SX5E Index', 'POLAND': 'SX5E Index',
-    'HUNGARY': 'SX5E Index', 'IRELAND': 'SX5E Index'
+    'HUNGARY': 'SX5E Index', 'IRELAND': 'SX5E Index',
+    
+    # --- NOUVEAUX BENCHMARKS MSCI ---
+    
+    # Monde, Transatlantique & Zones Mixtes -> MSCI World
+    'Monde': 'MSCI WORLD Index', 
+    'WORLD': 'MSCI WORLD Index', 
+    'Monde - Marchés émergents': 'MSCI WORLD Index',
+    'BERMUDA': 'MSCI WORLD Index', 
+    'TRANSATLANTIC': 'MSCI WORLD Index', 
+    'Transatlantique': 'MSCI WORLD Index',
+    'Europe - US - Japon': 'MSCI WORLD Index',
+    'Asie - US': 'MSCI WORLD Index',
+    'EurAsie': 'MSCI WORLD Index',
+    'Euro-asie': 'MSCI WORLD Index',
+    'Europe - Asie': 'MSCI WORLD Index',
+    'Chine - Europe': 'MSCI WORLD Index',
+    
+    # Asie Pacifique -> MSCI AC Asia Pacific
+    'Asie': 'MSCI AC ASIA PACIFIC Index', 
+    'AUSTRALIA': 'MSCI AC ASIA PACIFIC Index',
+    
+    # Émergents -> MSCI Emerging Markets
+    'Marchés émergents': 'MSCI EM Index',
+    'BRAZIL': 'MSCI EM Index', 
+    'CHILE': 'MSCI EM Index', 
+    'JORDAN': 'MSCI EM Index', 
+    'KAZAKHSTAN': 'MSCI EM Index', 
+    'RUSSIA': 'MSCI EM Index'
 }
 
 asset_country = str(asset_info.get('country', '')).strip()
