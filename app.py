@@ -257,16 +257,19 @@ with tab_screener:
         )
 
     with col_exp2:
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            table_display.to_excel(writer, index=False, sheet_name='Screener')
-        st.download_button(
-            label="Télécharger Excel",
-            data=excel_buffer.getvalue(),
-            file_name=f"screener_univers_{datetime.date.today()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
-        )
+        try:
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                table_display.to_excel(writer, index=False, sheet_name='Screener')
+            st.download_button(
+                label="Télécharger Excel",
+                data=excel_buffer.getvalue(),
+                file_name=f"screener_univers_{datetime.date.today()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        except Exception:
+            st.button("Excel indisponible (installer openpyxl)", disabled=True, use_container_width=True)
 
     # Configuration des colonnes pour le tableau interactif
     column_config = {
