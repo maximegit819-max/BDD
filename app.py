@@ -49,18 +49,10 @@ def compute_screener_metrics(assets_df, prices_pivot):
     date_now = prices_pivot.index[-1]
     last_prices = prices_pivot.iloc[-1]
     
-    # Performances
-    dates_5d = prices_pivot.index[prices_pivot.index <= date_now - pd.Timedelta(days=5)]
-    p_5d = prices_pivot.loc[dates_5d[-1]] if len(dates_5d) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
-    perf_5d = ((last_prices / p_5d) - 1) * 100
-
+    # Performances (1M, YTD, 1A)
     dates_1m = prices_pivot.index[prices_pivot.index <= date_now - pd.Timedelta(days=30)]
     p_1m = prices_pivot.loc[dates_1m[-1]] if len(dates_1m) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
     perf_1m = ((last_prices / p_1m) - 1) * 100
-
-    dates_3m = prices_pivot.index[prices_pivot.index <= date_now - pd.Timedelta(days=90)]
-    p_3m = prices_pivot.loc[dates_3m[-1]] if len(dates_3m) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
-    perf_3m = ((last_prices / p_3m) - 1) * 100
 
     dates_ytd = prices_pivot.index[prices_pivot.index <= pd.Timestamp(year=date_now.year - 1, month=12, day=31)]
     p_ytd = prices_pivot.loc[dates_ytd[-1]] if len(dates_ytd) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
@@ -70,56 +62,37 @@ def compute_screener_metrics(assets_df, prices_pivot):
     p_1y = prices_pivot.loc[dates_1y[-1]] if len(dates_1y) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
     perf_1y = ((last_prices / p_1y) - 1) * 100
 
-    # Volatilités annualisées
+    # Volatilités annualisées (3 Mois et 1 An)
     daily_returns = prices_pivot.pct_change(fill_method=None)
-    returns_1m = daily_returns.loc[daily_returns.index >= date_now - pd.Timedelta(days=30)]
-    vol_1m = returns_1m.std() * np.sqrt(252) * 100
+    returns_3m = daily_returns.loc[daily_returns.index >= date_now - pd.Timedelta(days=90)]
+    vol_3m = returns_3m.std() * np.sqrt(252) * 100
 
     returns_1y = daily_returns.loc[daily_returns.index >= date_now - pd.Timedelta(days=365)]
     vol_1y = returns_1y.std() * np.sqrt(252) * 100
 
-    # 52W High / Low & Drawdown 1 An
+    # Max Drawdown 1 An
     prices_1y = prices_pivot.loc[prices_pivot.index >= date_now - pd.Timedelta(days=365)]
-    high_52w = prices_1y.max()
-    low_52w = prices_1y.min()
-    dist_52w_high = ((last_prices / high_52w) - 1) * 100
-    dist_52w_low = ((last_prices / low_52w) - 1) * 100
-
     cummax_1y = prices_1y.cummax()
     drawdown_1y = (prices_1y - cummax_1y) / cummax_1y
     max_dd_1y = drawdown_1y.min() * 100
 
-    # Indicateurs Techniques
+    # Écartement aux Moyennes Mobiles (SMA 50 et SMA 200)
     sma50 = prices_pivot.rolling(50, min_periods=5).mean().iloc[-1]
     sma200 = prices_pivot.rolling(200, min_periods=20).mean().iloc[-1]
     dist_sma50 = ((last_prices / sma50) - 1) * 100
     dist_sma200 = ((last_prices / sma200) - 1) * 100
 
-    # RSI (14 jours)
-    diff = prices_pivot.diff()
-    gain = diff.clip(lower=0)
-    loss = -diff.clip(upper=0)
-    avg_gain = gain.rolling(window=14, min_periods=14).mean().iloc[-1]
-    avg_loss = loss.rolling(window=14, min_periods=14).mean().iloc[-1]
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    rsi_14 = 100 - (100 / (1 + rs))
-
     metrics_df = pd.DataFrame({
         'asset_id': prices_pivot.columns,
         'last_price': last_prices.values,
-        'perf_5d': perf_5d.values,
         'perf_1m': perf_1m.values,
-        'perf_3m': perf_3m.values,
         'perf_ytd': perf_ytd.values,
         'perf_1y': perf_1y.values,
-        'vol_1m': vol_1m.values,
+        'vol_3m': vol_3m.values,
         'vol_1y': vol_1y.values,
         'max_dd_1y': max_dd_1y.values,
-        'dist_52w_high': dist_52w_high.values,
-        'dist_52w_low': dist_52w_low.values,
         'dist_sma50': dist_sma50.values,
-        'dist_sma200': dist_sma200.values,
-        'rsi_14': rsi_14.values
+        'dist_sma200': dist_sma200.values
     })
 
     merged = pd.merge(assets_df, metrics_df, on='asset_id', how='left')
@@ -165,16 +138,7 @@ with tab_screener:
     with col_f5:
         sel_currencies = st.multiselect("Devise", options=currencies_list)
 
-    # Filtres quantitatifs avancés (repliables)
-    with st.expander("Filtres quantitatifs avancés"):
-        col_q1, col_q2, col_q3 = st.columns(3)
-        with col_q1:
-            filter_only_priced = st.checkbox("Uniquement les actifs avec cours historique", value=True)
-            filter_ytd_pos = st.checkbox("Performance YTD positive uniquement", value=False)
-        with col_q2:
-            max_vol_1y = st.number_input("Volatilité 1A Max (%)", min_value=0.0, max_value=200.0, value=0.0, step=5.0)
-        with col_q3:
-            rsi_range = st.slider("Plage RSI (14j)", min_value=0.0, max_value=100.0, value=(0.0, 100.0), step=1.0)
+    filter_only_priced = st.checkbox("Masquer les actifs sans historique de cours", value=True)
 
     # Application des filtres
     df_filtered = screener_raw_df.copy()
@@ -201,41 +165,22 @@ with tab_screener:
     if filter_only_priced:
         df_filtered = df_filtered[df_filtered['last_price'].notna() & (df_filtered['last_price'] > 0)]
 
-    if filter_ytd_pos:
-        df_filtered = df_filtered[df_filtered['perf_ytd'] > 0]
-
-    if max_vol_1y > 0:
-        df_filtered = df_filtered[df_filtered['vol_1y'] <= max_vol_1y]
-
-    if rsi_range != (0.0, 100.0):
-        df_filtered = df_filtered[
-            (df_filtered['rsi_14'] >= rsi_range[0]) & (df_filtered['rsi_14'] <= rsi_range[1])
-        ]
-
-    # Sélection et renommage des colonnes pour un affichage institutionnel
+    # Sélection et renommage des colonnes épurées
     columns_mapping = {
         'name': 'Nom',
         'ticker_bloomberg': 'Ticker Bloomberg',
         'isin': 'ISIN',
-        'asset_type': 'Type',
-        'asset_subtype': 'Sous-Type',
         'sector': 'Secteur',
-        'country': 'Pays',
         'currency': 'Devise',
         'last_price': 'Dernier Cours',
-        'perf_5d': 'Perf 5J (%)',
         'perf_1m': 'Perf 1M (%)',
-        'perf_3m': 'Perf 3M (%)',
         'perf_ytd': 'Perf YTD (%)',
         'perf_1y': 'Perf 1A (%)',
-        'vol_1m': 'Vol 1M (%)',
+        'vol_3m': 'Vol 3M (%)',
         'vol_1y': 'Vol 1A (%)',
         'max_dd_1y': 'Max DD 1A (%)',
-        'dist_52w_high': 'Dist. 52W High (%)',
-        'dist_52w_low': 'Dist. 52W Low (%)',
         'dist_sma50': 'Écart SMA 50 (%)',
-        'dist_sma200': 'Écart SMA 200 (%)',
-        'rsi_14': 'RSI (14)'
+        'dist_sma200': 'Écart SMA 200 (%)'
     }
 
     cols_to_keep = [c for c in columns_mapping.keys() if c in df_filtered.columns]
@@ -244,7 +189,7 @@ with tab_screener:
     # Entête d'information et export
     col_info, col_exp1, col_exp2 = st.columns([3, 1, 1])
     with col_info:
-        st.write(f"**Actifs correspondants :** {len(table_display)} sur {len(screener_raw_df)}")
+        st.write(f"**Actifs affichés :** {len(table_display)} sur {len(screener_raw_df)}")
 
     with col_exp1:
         csv_data = table_display.to_csv(index=False).encode('utf-8')
@@ -274,19 +219,14 @@ with tab_screener:
     # Configuration des colonnes pour le tableau interactif
     column_config = {
         "Dernier Cours": st.column_config.NumberColumn(format="%.2f"),
-        "Perf 5J (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Perf 1M (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "Perf 3M (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Perf YTD (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Perf 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "Vol 1M (%)": st.column_config.NumberColumn(format="%.2f %%"),
+        "Vol 3M (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Vol 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Max DD 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "Dist. 52W High (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "Dist. 52W Low (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Écart SMA 50 (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "Écart SMA 200 (%)": st.column_config.NumberColumn(format="%.2f %%"),
-        "RSI (14)": st.column_config.NumberColumn(format="%.1f")
+        "Écart SMA 200 (%)": st.column_config.NumberColumn(format="%.2f %%")
     }
 
     st.dataframe(
