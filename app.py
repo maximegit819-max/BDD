@@ -101,10 +101,12 @@ def compute_screener_metrics(assets_df, prices_pivot):
 with st.spinner("Chargement des données en cours..."):
     assets_df = load_assets()
     prices_pivot = load_all_prices()
+    
+    # Ajout du display_name pour la recherche (avant le merge des métriques !)
+    assets_df['display_name'] = assets_df['name'].fillna('Inconnu') + " (" + assets_df['ticker_bloomberg'].fillna('') + ")"
+    
     screener_raw_df = compute_screener_metrics(assets_df, prices_pivot)
 
-# Ajout du display_name pour la recherche
-assets_df['display_name'] = assets_df['name'].fillna('Inconnu') + " (" + assets_df['ticker_bloomberg'].fillna('') + ")"
 asset_options = dict(zip(assets_df['display_name'], assets_df['asset_id']))
 
 # 3. Onglets principaux de navigation
