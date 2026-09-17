@@ -229,13 +229,21 @@ with tab_screener:
         "Écart SMA 200 (%)": st.column_config.NumberColumn(format="%.2f %%")
     }
 
-    st.dataframe(
+    event = st.dataframe(
         table_display,
         column_config=column_config,
         use_container_width=True,
         hide_index=True,
-        height=600
+        height=600,
+        selection_mode="single-row",
+        on_select="rerun"
     )
+
+    # Si l'utilisateur clique sur une ligne, on pré-charge l'actif pour l'onglet 2
+    if event.selection.rows:
+        selected_row_idx = event.selection.rows[0]
+        selected_disp_name = df_filtered.iloc[selected_row_idx]['display_name']
+        st.session_state["detail_asset_select"] = selected_disp_name
 
 
 # ==========================================
@@ -261,7 +269,7 @@ with tab_detail:
     # --- 1. Fiche d'Identité ---
     st.subheader("Fiche d'Identité")
 
-    is_index = asset_info.get('asset_type') == 'INDEX' or pd.notna(asset_info.get('issuer'))
+    is_index = asset_info.get('asset_type') == 'Indice' or pd.notna(asset_info.get('issuer'))
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
