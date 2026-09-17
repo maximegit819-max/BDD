@@ -353,50 +353,7 @@ with tab_detail:
         if len(sub_returns) < 2: return np.nan
         return sub_returns.std() * np.sqrt(252) * 100
 
-    # --- 2. Tableaux Perf / Vol ---
-    st.subheader(f"Performances et Volatilités (Dernier cours : {current_price:.2f})")
-
-    perf_data = {
-        "5 Jours": get_perf(days=5),
-        "1 Mois": get_perf(days=30),
-        "3 Mois": get_perf(days=90),
-        "YTD": get_perf(ytd=True),
-    }
-
-    vol_data = {
-        "5 Jours": get_vol(days=5),
-        "1 Mois": get_vol(days=30),
-        "3 Mois": get_vol(days=90),
-        "YTD": get_vol(ytd=True),
-        "1 An": get_vol(days=365),
-        "5 Ans": get_vol(days=365*5),
-    }
-
-    col_perf, col_vol = st.columns(2)
-
-    with col_perf:
-        st.markdown("**Performances**")
-        perf_df = pd.DataFrame([perf_data]).T
-        perf_df.columns = ["Performance"]
-        st.dataframe(
-            perf_df.style.format("{:.2f} %"),
-            use_container_width=True
-        )
-
-    with col_vol:
-        st.markdown("**Volatilité Annualisée**")
-        vol_df = pd.DataFrame([vol_data]).T
-        vol_df.columns = ["Volatilité"]
-        st.dataframe(
-            vol_df.style.format("{:.2f} %"),
-            use_container_width=True
-        )
-
-    st.divider()
-
-    # --- 3. Graphique Technique ---
-    st.subheader("Cours")
-
+    # --- Résolution du Benchmark (pour le Bêta et le Graphique) ---
     benchmark_mapping = {
         'FRANCE': 'CAC Index', 'France': 'CAC Index',
         'GERMANY': 'DAX Index', 'ALLEMAGNE': 'DAX Index', 'Allemagne': 'DAX Index',
@@ -442,6 +399,80 @@ with tab_detail:
         bench_match = assets_df[assets_df['ticker_bloomberg'] == benchmark_ticker]
         if not bench_match.empty:
             benchmark_asset_id = bench_match.iloc[0]['asset_id']
+
+    def get_beta(days=365):
+        if not benchmark_asset_id or benchmark_asset_id not in prices_pivot.columns:
+            return np.nan
+        bench_prices = prices_pivot[benchmark_asset_id].dropna()
+        bench_prices = bench_prices[bench_prices > 0]
+        if len(bench_prices) == 0: return np.nan
+        bench_returns = bench_prices.pct_change(fill_method=None).dropna()
+        
+        # Aligner les dates
+        cutoff_date = current_date - pd.Timedelta(days=days)
+        sub_asset = daily_returns[daily_returns.index >= cutoff_date]
+        sub_bench = bench_returns[bench_returns.index >= cutoff_date]
+        
+        common_dates = sub_asset.index.intersection(sub_bench.index)
+        if len(common_dates) < 20: # Il faut un minimum de jours
+            return np.nan
+            
+        aligned_asset = sub_asset.loc[common_dates]
+        aligned_bench = sub_bench.loc[common_dates]
+        
+        cov = aligned_asset.cov(aligned_bench)
+        var = aligned_bench.var()
+        if var == 0: return np.nan
+        return cov / var
+
+    # --- 2. Tableaux Perf / Vol / Bêta ---
+    st.subheader(f"Performances et Risques (Dernier cours : {current_price:.2f})")
+
+    perf_data = {
+        "5 Jours": get_perf(days=5),
+        "1 Mois": get_perf(days=30),
+        "3 Mois": get_perf(days=90),
+        "YTD": get_perf(ytd=True),
+    }
+
+    vol_data = {
+        "1 Mois": get_vol(days=30),
+        "3 Mois": get_vol(days=90),
+        "YTD": get_vol(ytd=True),
+        "1 An": get_vol(days=365),
+    }
+    
+    beta_data = {
+        "1 An": get_beta(days=365),
+        "3 Ans": get_beta(days=365*3),
+    }
+
+    col_perf, col_vol, col_beta = st.columns(3)
+
+    with col_perf:
+        st.markdown("**Performances**")
+        perf_df = pd.DataFrame([perf_data]).T
+        perf_df.columns = ["Performance"]
+        st.dataframe(perf_df.style.format("{:.2f} %"), use_container_width=True)
+
+    with col_vol:
+        st.markdown("**Volatilité Annualisée**")
+        vol_df = pd.DataFrame([vol_data]).T
+        vol_df.columns = ["Volatilité"]
+        st.dataframe(vol_df.style.format("{:.2f} %"), use_container_width=True)
+        
+    with col_beta:
+        bench_disp = benchmark_ticker if benchmark_ticker else "N/A"
+        st.markdown(f"**Bêta (vs {bench_disp})**")
+        beta_df = pd.DataFrame([beta_data]).T
+        beta_df.columns = ["Coefficient"]
+        # Streamlit style for handling NaN gracefully
+        st.dataframe(beta_df.style.format(na_rep="N/A", formatter="{:.2f}"), use_container_width=True)
+
+    st.divider()
+
+    # --- 3. Graphique Technique ---
+    st.subheader("Cours")
 
     show_benchmark = False
     if benchmark_asset_id and benchmark_asset_id in prices_pivot.columns:
