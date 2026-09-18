@@ -110,7 +110,7 @@ with st.spinner("Chargement des données en cours..."):
 asset_options = dict(zip(assets_df['display_name'], assets_df['asset_id']))
 
 # 3. Onglets principaux de navigation
-tab_screener, tab_detail = st.tabs(["Screener Univers", "Fiche Détaillée Actif"])
+tab_screener, tab_detail, tab_compare = st.tabs(["Screener Univers", "Fiche Détaillée Actif", "Comparaison de Cours"])
 
 # ==========================================
 # ONGLET 1 : SCREENER UNIVERS
@@ -587,3 +587,107 @@ with tab_detail:
                 st.info("Pas assez de données pour calculer les corrélations sur cet univers.")
         else:
             st.warning("L'actif sélectionné n'a pas de données sur la dernière année.")
+
+# ==========================================
+# ONGLET 3 : COMPARAISON DE COURS
+# ==========================================
+with tab_compare:
+    st.header("Comparaison de Cours (Base 100)")
+    
+    selected_compare_names = st.multiselect(
+        "Ajoutez des actifs à comparer :",
+        options=sorted(asset_options.keys()),
+        default=[],
+        key="compare_assets_multiselect"
+    )
+    
+    if len(selected_compare_names) > 0:
+        time_filter = st.radio(
+            "Période",
+            ["1 Mois", "3 Mois", "YTD", "1 An", "3 Ans", "5 Ans", "Max"],
+            index=6,
+            horizontal=True
+        )
+        
+        selected_ids = [asset_options[name] for name in selected_compare_names]
+        valid_ids = [aid for aid in selected_ids if aid in prices_pivot.columns]
+        
+        if len(valid_ids) == 0:
+            st.warning("Aucun historique de prix n'est disponible pour les actifs sélectionnés.")
+        else:
+            compare_prices = prices_pivot[valid_ids].dropna(how='all')
+            
+            # Filtre temporel
+            current_date = compare_prices.index.max()
+            if time_filter == "1 Mois":
+                cutoff = current_date - pd.Timedelta(days=30)
+            elif time_filter == "3 Mois":
+                cutoff = current_date - pd.Timedelta(days=90)
+            elif time_filter == "YTD":
+                cutoff = pd.Timestamp(year=current_date.year - 1, month=12, day=31)
+            elif time_filter == "1 An":
+                cutoff = current_date - pd.Timedelta(days=365)
+            elif time_filter == "3 Ans":
+                cutoff = current_date - pd.Timedelta(days=365*3)
+            elif time_filter == "5 Ans":
+                cutoff = current_date - pd.Timedelta(days=365*5)
+            else: # Max
+                cutoff = compare_prices.index.min()
+                
+            compare_prices = compare_prices[compare_prices.index >= cutoff]
+            
+            # Trouver la date de départ commune (max des dates de début individuelles)
+            start_dates = compare_prices.apply(lambda x: x.first_valid_index())
+            common_start_date = start_dates.max()
+            
+            if pd.isna(common_start_date):
+                st.warning("Aucune période commune trouvée entre ces actifs pour la période sélectionnée.")
+            else:
+                # Filtrer depuis la date de départ commune
+                compare_prices_common = compare_prices[compare_prices.index >= common_start_date]
+                
+                # Rebaser en base 100
+                first_prices = compare_prices_common.iloc[0]
+                base_100_prices = (compare_prices_common / first_prices) * 100
+                
+                fig = go.Figure()
+                for aid in valid_ids:
+                    name_disp = [k for k, v in asset_options.items() if v == aid][0]
+                    fig.add_trace(go.Scatter(
+                        x=base_100_prices.index,
+                        y=base_100_prices[aid],
+                        mode='lines',
+                        name=name_disp,
+                        line=dict(width=2)
+                    ))
+                
+                fig.update_layout(
+                    hovermode="x unified",
+                    height=600,
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    yaxis_title="Base 100",
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.1,
+                        xanchor="center",
+                        x=0.5
+                    )
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Petit tableau récapitulatif des performances
+                st.markdown(f"**Performance depuis le point commun ({common_start_date.strftime('%d/%m/%Y')})**")
+                perf_series = (base_100_prices.iloc[-1] - 100)
+                perf_df = perf_series.reset_index()
+                perf_df.columns = ['asset_id', 'Performance']
+                id_to_name = {v: k for k, v in asset_options.items()}
+                perf_df['Actif'] = perf_df['asset_id'].map(id_to_name)
+                perf_df = perf_df[['Actif', 'Performance']].sort_values(by='Performance', ascending=False)
+                
+                st.dataframe(
+                    perf_df.style.format({'Performance': "{:.2f} %"}),
+                    use_container_width=True,
+                    hide_index=True
+                )
