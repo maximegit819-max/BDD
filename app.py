@@ -109,6 +109,10 @@ with st.spinner("Chargement des données en cours..."):
 
 asset_options = dict(zip(assets_df['display_name'], assets_df['asset_id']))
 
+last_date = prices_pivot.index.max()
+if pd.notna(last_date):
+    st.info(f"**Dernière mise à jour des cours en base :** {last_date.strftime('%d/%m/%Y')}")
+
 # 3. Onglets principaux de navigation
 tab_screener, tab_detail, tab_compare = st.tabs(["Screener Univers", "Fiche Détaillée Actif", "Comparaison de Cours"])
 
