@@ -356,6 +356,28 @@ with tab_compare:
                     hide_index=True
                 )
                 
+                st.divider()
+                st.subheader("Comparaison des Volatilités (1 An Glissant)")
+                fig_vol_comp = go.Figure()
+                for aid in valid_ids:
+                    name_disp = [k for k, v in asset_options.items() if v == aid][0]
+                    # Retrait des zéros éventuels (absence de données) avant le calcul
+                    clean_prices = compare_prices_common[aid].replace(0, np.nan).dropna()
+                    asset_returns = clean_prices.pct_change()
+                    # min_periods=252 garantit que le graph ne commence qu'après 1 an complet de données
+                    roll_vol = asset_returns.rolling(window=252, min_periods=252).std() * np.sqrt(252) * 100
+                    
+                    fig_vol_comp.add_trace(go.Scatter(
+                        x=roll_vol.index, y=roll_vol, mode='lines', name=name_disp, line=dict(width=1.5)
+                    ))
+                
+                fig_vol_comp.update_layout(
+                    hovermode="x unified", height=500, margin=dict(l=0, r=0, t=30, b=0),
+                    yaxis_title="Volatilité Annualisée (%)",
+                    legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
+                )
+                st.plotly_chart(fig_vol_comp, use_container_width=True)
+
                 # --- Panier équipondéré ---
                 if len(valid_ids) > 1:
                     st.divider()
@@ -669,6 +691,25 @@ with tab_detail:
 
     fig.update_layout(hovermode="x unified", height=500, margin=dict(l=0, r=0, t=30, b=0))
     st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # --- 3.5 Volatilité Annuelle Glissante ---
+    st.subheader("Volatilité Annualisée (1 An Glissant)")
+    clean_asset_prices = asset_prices.replace(0, np.nan).dropna()
+    asset_returns = clean_asset_prices.pct_change()
+    roll_vol = asset_returns.rolling(window=252, min_periods=252).std() * np.sqrt(252) * 100
+    
+    fig_vol = go.Figure()
+    fig_vol.add_trace(go.Scatter(
+        x=roll_vol.index, y=roll_vol, mode='lines', name='Volatilité', 
+        line=dict(color='#ff9900', width=2)
+    ))
+    fig_vol.update_layout(
+        hovermode="x unified", height=400, margin=dict(l=0, r=0, t=30, b=0), 
+        yaxis_title="Volatilité (%)"
+    )
+    st.plotly_chart(fig_vol, use_container_width=True)
 
     st.divider()
 
