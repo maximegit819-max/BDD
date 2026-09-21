@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import datetime
 
 # 1. Configuration de la page
-st.set_page_config(page_title="Asset 360", layout="wide")
+st.set_page_config(page_title="Base de Données", layout="wide")
 
 @st.cache_resource
 def init_connection():
