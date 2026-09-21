@@ -351,6 +351,43 @@ with tab_compare:
                     use_container_width=True,
                     hide_index=True
                 )
+                
+                # --- Panier équipondéré ---
+                if len(valid_ids) > 1:
+                    st.divider()
+                    st.subheader("Performance du Panier Équipondéré")
+                    st.markdown("Évolution d'un portefeuille théorique investi à parts égales sur les actifs sélectionnés à la date de départ (sans rebalancement).")
+                    
+                    basket_prices = base_100_prices.mean(axis=1)
+                    
+                    fig_basket = go.Figure()
+                    fig_basket.add_trace(go.Scatter(
+                        x=basket_prices.index,
+                        y=basket_prices,
+                        mode='lines',
+                        name='Panier Équipondéré',
+                        line=dict(width=3, color='#FF9900')
+                    ))
+                    
+                    fig_basket.update_layout(
+                        hovermode="x unified",
+                        height=400,
+                        margin=dict(l=0, r=0, t=30, b=0),
+                        yaxis_title="Base 100",
+                        showlegend=True,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="top",
+                            y=-0.1,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    
+                    st.plotly_chart(fig_basket, use_container_width=True)
+                    
+                    basket_perf = basket_prices.iloc[-1] - 100
+                    st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
 # ==========================================
 # ONGLET 2 : FICHE DETAILLEE ACTIF
 # ==========================================
