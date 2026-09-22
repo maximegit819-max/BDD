@@ -7,9 +7,44 @@ import io
 from dotenv import load_dotenv
 import plotly.graph_objects as go
 import datetime
+from pptx import Presentation
+from pptx.util import Inches
 
 # 1. Configuration de la page
 st.set_page_config(page_title="Base de Données", layout="wide")
+
+# --- VERROUILLAGE DE L'APPLICATION (Mot de passe) ---
+def check_password():
+    """Affiche un champ de mot de passe et bloque l'application si incorrect."""
+    def password_entered():
+        try:
+            expected_pwd = st.secrets["APP_PASSWORD"]
+        except Exception:
+            load_dotenv()
+            expected_pwd = os.getenv("APP_PASSWORD")
+            
+        if st.session_state["password"] == expected_pwd:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Suppression par sécurité
+        else:
+            st.session_state["password_correct"] = False
+
+    if st.session_state.get("password_correct", False):
+        return True
+
+    st.title("🔒 Accès Sécurisé")
+    st.text_input(
+        "Veuillez entrer le mot de passe pour accéder à l'univers d'investissement :", 
+        type="password", 
+        on_change=password_entered, 
+        key="password"
+    )
+    if "password_correct" in st.session_state:
+        st.error("Mot de passe incorrect 😕")
+    return False
+
+if not check_password():
+    st.stop()  # Bloque tout le reste du script tant que le mot de passe n'est pas validé.
 
 @st.cache_resource
 def init_connection():
@@ -25,6 +60,70 @@ def init_connection():
     return create_engine(db_url)
 
 engine = init_connection()
+
+# --- Fonctions d'exportation (Excel / PPTX) ---
+def create_excel_report(dfs_dict, figs_dict):
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        workbook = writer.book
+        worksheet = workbook.add_worksheet('Rapport')
+        row = 0
+        for title, df in dfs_dict.items():
+            worksheet.write(row, 0, title)
+            row += 1
+            df.to_excel(writer, sheet_name='Rapport', startrow=row, index=False)
+            row += len(df) + 2
+            
+        for title, fig in figs_dict.items():
+            try:
+                img_bytes = fig.to_image(format="png", width=800, height=500)
+                img_buffer = io.BytesIO(img_bytes)
+                worksheet.write(row, 0, title)
+                row += 1
+                worksheet.insert_image(row, 0, title, {'image_data': img_buffer})
+                row += 26
+            except Exception as e:
+                worksheet.write(row, 0, f"Erreur export image {title}: {e}")
+                row += 2
+    buffer.seek(0)
+    return buffer
+
+def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
+    prs = Presentation()
+    
+    title_slide = prs.slides.add_slide(prs.slide_layouts[0])
+    title_slide.shapes.title.text = title
+    
+    for df_title, df in dfs_dict.items():
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        slide.shapes.title.text = df_title
+        rows, cols = df.shape
+        table_shape = slide.shapes.add_table(rows + 1, cols, Inches(1), Inches(2), Inches(8), Inches(0.4 * (rows+1))).table
+        for c, col_name in enumerate(df.columns):
+            table_shape.cell(0, c).text = str(col_name)
+        for r in range(rows):
+            for c in range(cols):
+                val = df.iloc[r, c]
+                if pd.isna(val):
+                    val = "N/A"
+                elif isinstance(val, float):
+                    val = f"{val:.4f}"
+                table_shape.cell(r + 1, c).text = str(val)
+                
+    for fig_title, fig in figs_dict.items():
+        slide = prs.slides.add_slide(prs.slide_layouts[5])
+        slide.shapes.title.text = fig_title
+        try:
+            img_bytes = fig.to_image(format="png", width=800, height=500)
+            img_buffer = io.BytesIO(img_bytes)
+            slide.shapes.add_picture(img_buffer, Inches(1), Inches(1.5), width=Inches(8))
+        except Exception as e:
+            slide.shapes.placeholders[1].text = f"Erreur export image: {e}"
+        
+    buffer = io.BytesIO()
+    prs.save(buffer)
+    buffer.seek(0)
+    return buffer
 
 # 2. Récupération et mise en cache des données
 @st.cache_data(ttl=3600*24)
@@ -414,6 +513,25 @@ with tab_compare:
                     
                     basket_perf = basket_prices.iloc[-1] - 100
                     st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
+
+                st.divider()
+                st.subheader("Exporter le rapport de Comparaison")
+                with st.expander("Générer les fichiers Excel et PowerPoint"):
+                    if st.button("Préparer l'exportation", key="btn_export_compare"):
+                        with st.spinner("Génération des fichiers..."):
+                            dfs_export = {"Performance": perf_df}
+                            figs_export = {"Base 100": fig, "Volatilité": fig_vol_comp}
+                            if len(valid_ids) > 1:
+                                figs_export["Panier Équipondéré"] = fig_basket
+                                
+                            st.session_state["compare_exports"] = {
+                                "excel": create_excel_report(dfs_export, figs_export),
+                                "pptx": create_pptx_report(dfs_export, figs_export, title="Comparaison de Cours")
+                            }
+                    if "compare_exports" in st.session_state:
+                        st.download_button("Télécharger Excel", st.session_state["compare_exports"]["excel"], file_name="comparaison.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                        st.download_button("Télécharger PowerPoint", st.session_state["compare_exports"]["pptx"], file_name="comparaison.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
 # ==========================================
 # ONGLET 2 : FICHE DETAILLEE ACTIF
 # ==========================================
@@ -773,3 +891,29 @@ with tab_detail:
         else:
             st.warning("L'actif sélectionné n'a pas de données sur la dernière année.")
 
+    st.divider()
+    st.subheader("Exporter le rapport Détaillé")
+    with st.expander("Générer les fichiers Excel et PowerPoint"):
+        if st.button(f"Préparer l'exportation pour {selected_asset_name}", key="btn_export_detail"):
+            with st.spinner("Génération des fichiers..."):
+                dfs_export = {
+                    "Performances": perf_df,
+                    "Volatilité": vol_df,
+                    "Bêta": beta_df
+                }
+                if 'top_10' in locals() and top_10 is not None:
+                    dfs_export["Top Corrélations"] = top_10
+                    dfs_export["Flop Corrélations"] = bottom_10
+                    
+                figs_export = {
+                    "Cours": fig,
+                    "Volatilité Glissante": fig_vol
+                }
+                
+                st.session_state["detail_exports"] = {
+                    "excel": create_excel_report(dfs_export, figs_export),
+                    "pptx": create_pptx_report(dfs_export, figs_export, title=f"Fiche Détaillée: {selected_asset_name}")
+                }
+        if "detail_exports" in st.session_state:
+            st.download_button("Télécharger Excel", st.session_state["detail_exports"]["excel"], file_name=f"fiche_detaillee.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("Télécharger PowerPoint", st.session_state["detail_exports"]["pptx"], file_name=f"fiche_detaillee.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
