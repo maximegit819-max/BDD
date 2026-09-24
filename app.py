@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import datetime
 from pptx import Presentation
 from pptx.util import Inches
+import itertools
 
 # 1. Configuration de la page
 st.set_page_config(page_title="Base de Données", layout="wide")
@@ -522,6 +523,45 @@ with tab_compare:
                     basket_perf = basket_prices.iloc[-1] - 100
                     st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
 
+                    # --- Corrélation Glissante ---
+                    st.divider()
+                    st.subheader("Corrélation Croisée (1 An Glissant)")
+                    st.markdown("Évolution de la corrélation des rendements quotidiens entre les actifs sur une fenêtre glissante de 1 an (252 jours).")
+                    
+                    returns_df = compare_prices_common.pct_change(fill_method=None).dropna()
+                    
+                    fig_corr = go.Figure()
+                    pairs = list(itertools.combinations(valid_ids, 2))
+                    
+                    # On limite à 10 paires pour éviter un graphique illisible si on sélectionne trop d'actifs
+                    for aid1, aid2 in pairs[:10]:
+                        name1 = [k for k, v in asset_options.items() if v == aid1][0]
+                        name2 = [k for k, v in asset_options.items() if v == aid2][0]
+                        
+                        roll_corr = returns_df[aid1].rolling(window=252, min_periods=252).corr(returns_df[aid2])
+                        
+                        fig_corr.add_trace(go.Scatter(
+                            x=roll_corr.index, 
+                            y=roll_corr, 
+                            mode='lines', 
+                            name=f"{name1[:15]}... vs {name2[:15]}...", 
+                            line=dict(width=1.5)
+                        ))
+                        
+                    fig_corr.update_layout(
+                        hovermode="x unified", 
+                        height=400, 
+                        margin=dict(l=0, r=0, t=30, b=0),
+                        yaxis_title="Corrélation",
+                        yaxis=dict(range=[-1.1, 1.1]),
+                        legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
+                    )
+                    
+                    st.plotly_chart(fig_corr, use_container_width=True)
+                    
+                    if len(pairs) > 10:
+                        st.info("Le graphique est limité aux 10 premières paires pour rester lisible.")
+
                 st.divider()
                 st.subheader("Exporter le rapport de Comparaison")
                 with st.expander("Générer les fichiers Excel et PowerPoint"):
@@ -531,6 +571,7 @@ with tab_compare:
                             figs_export = {"Base 100": fig, "Volatilité": fig_vol_comp}
                             if len(valid_ids) > 1:
                                 figs_export["Panier Équipondéré"] = fig_basket
+                                figs_export["Corrélations Croisées"] = fig_corr
                                 
                             st.session_state["compare_exports"] = {
                                 "excel": create_excel_report(dfs_export, figs_export),
