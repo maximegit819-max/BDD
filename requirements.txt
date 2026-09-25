@@ -9,3 +9,4 @@ openpyxl
 python-pptx
 kaleido
 xlsxwriter
+psycopg[binary]
