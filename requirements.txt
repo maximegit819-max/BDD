@@ -8,6 +8,6 @@ python-dotenv
 plotly
 openpyxl
 python-pptx
-kaleido==0.1.0.post1
+kaleido
 xlsxwriter
 supabase
