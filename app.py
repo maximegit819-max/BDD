@@ -139,7 +139,9 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
 def load_assets():
     with engine.connect() as conn:
         df = pd.read_sql("SELECT * FROM asset", conn)
-        df['sector'] = df['sector'].replace('Diversifié', 'Multi-secteurs')
+        df['sector'] = df['sector'].str.strip()
+        df.loc[df['sector'].str.contains('multi', case=False, na=False), 'sector'] = 'Multi-secteurs'
+        df.loc[df['sector'].str.contains('diversifi', case=False, na=False), 'sector'] = 'Multi-secteurs'
         return df
 
 @st.cache_data(ttl=3600*24)
