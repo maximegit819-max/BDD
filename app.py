@@ -127,7 +127,8 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
             img_buffer = io.BytesIO(img_bytes)
             slide.shapes.add_picture(img_buffer, Inches(1), Inches(1.5), width=Inches(8))
         except Exception as e:
-            slide.shapes.placeholders[1].text = f"Erreur export image: {e}"
+            txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(1))
+            txBox.text_frame.text = f"Erreur export image: {e}"
         
     buffer = io.BytesIO()
     prs.save(buffer)

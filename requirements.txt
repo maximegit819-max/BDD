@@ -3,10 +3,11 @@ pandas
 numpy
 SQLAlchemy
 psycopg2-binary
+psycopg[binary]
 python-dotenv
 plotly
 openpyxl
 python-pptx
-kaleido
+kaleido==0.1.0.post1
 xlsxwriter
-psycopg[binary]
+supabase
