@@ -138,7 +138,9 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
 @st.cache_data(ttl=3600*24)
 def load_assets():
     with engine.connect() as conn:
-        return pd.read_sql("SELECT * FROM asset", conn)
+        df = pd.read_sql("SELECT * FROM asset", conn)
+        df['sector'] = df['sector'].replace('Diversifié', 'Multi-secteurs')
+        return df
 
 @st.cache_data(ttl=3600*24)
 def load_all_prices():
@@ -796,23 +798,23 @@ with tab_detail:
 
     with col_perf:
         st.markdown("**Performances**")
-        perf_df = pd.DataFrame([perf_data]).T
-        perf_df.columns = ["Performance"]
-        st.dataframe(perf_df.style.format("{:.2f} %"), use_container_width=True)
+        perf_df = pd.DataFrame([perf_data]).T.reset_index()
+        perf_df.columns = ["Période", "Performance"]
+        st.dataframe(perf_df.style.format({"Performance": "{:.2f} %"}), use_container_width=True, hide_index=True)
 
     with col_vol:
         st.markdown("**Volatilité Annualisée**")
-        vol_df = pd.DataFrame([vol_data]).T
-        vol_df.columns = ["Volatilité"]
-        st.dataframe(vol_df.style.format("{:.2f} %"), use_container_width=True)
+        vol_df = pd.DataFrame([vol_data]).T.reset_index()
+        vol_df.columns = ["Période", "Volatilité"]
+        st.dataframe(vol_df.style.format({"Volatilité": "{:.2f} %"}), use_container_width=True, hide_index=True)
         
     with col_beta:
         bench_disp = benchmark_ticker if benchmark_ticker else "N/A"
         st.markdown(f"**Bêta (vs {bench_disp})**")
-        beta_df = pd.DataFrame([beta_data]).T
-        beta_df.columns = ["Coefficient"]
+        beta_df = pd.DataFrame([beta_data]).T.reset_index()
+        beta_df.columns = ["Période", "Coefficient"]
         # Streamlit style for handling NaN gracefully
-        st.dataframe(beta_df.style.format(na_rep="N/A", formatter="{:.2f}"), use_container_width=True)
+        st.dataframe(beta_df.style.format({"Coefficient": "{:.2f}"}, na_rep="N/A"), use_container_width=True, hide_index=True)
 
     st.divider()
 
