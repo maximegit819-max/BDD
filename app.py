@@ -135,7 +135,7 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
     buffer.seek(0)
     return buffer
 
-def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_df, fig):
+def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_df, fig, template_name="template_nexo.pptx"):
     import os, io
     from pptx import Presentation
     from pptx.util import Inches
@@ -157,7 +157,7 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
         else:
             p.text = str(text)
 
-    template_path = os.path.join(os.path.dirname(__file__), 'template_nexo.pptx')
+    template_path = os.path.join(os.path.dirname(__file__), template_name)
     if not os.path.exists(template_path):
         prs = Presentation()
         prs.slides.add_slide(prs.slide_layouts[6])
@@ -175,17 +175,26 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
     try: set_text(slide.shapes[2], desc)
     except: pass
 
+    table_left, table_nexo, table_right, chart_shape = None, None, None, None
+    for shape in slide.shapes:
+        if shape.has_table:
+            cols = len(shape.table.columns)
+            if cols == 2: table_left = shape.table
+            elif cols == 3: table_nexo = shape.table
+            elif cols >= 4: table_right = shape.table
+        elif shape.shape_type == 3:
+            chart_shape = shape
+
     try:
-        table_left = slide.shapes[5].table
-        for r, row_data in enumerate(left_data):
-            for c, val in enumerate(row_data):
-                if r < len(table_left.rows) and c < len(table_left.columns):
-                    set_text(table_left.cell(r, c), val)
+        if table_left:
+            for r, row_data in enumerate(left_data):
+                for c, val in enumerate(row_data):
+                    if r < len(table_left.rows) and c < len(table_left.columns):
+                        set_text(table_left.cell(r, c), val)
     except: pass
 
-    if nexo_data:
+    if nexo_data and table_nexo:
         try:
-            table_nexo = slide.shapes[8].table
             for c, item in enumerate(nexo_data):
                 val, color_hex = item
                 if c < len(table_nexo.columns):
@@ -196,28 +205,27 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
         except: pass
 
     try:
-        table_right = slide.shapes[4].table
-        for c, col_name in enumerate(right_df.columns):
-            if c < len(table_right.columns):
-                set_text(table_right.cell(0, c), col_name if col_name else "")
-        rows, cols = right_df.shape
-        for r in range(rows):
-            for c in range(cols):
-                if r + 1 < len(table_right.rows) and c < len(table_right.columns):
-                    set_text(table_right.cell(r + 1, c), right_df.iloc[r, c])
+        if table_right:
+            rows, cols = right_df.shape
+            for r in range(rows):
+                for c in range(cols):
+                    if r + 1 < len(table_right.rows) and c < len(table_right.columns):
+                        val = right_df.iloc[r, c]
+                        if val != "MERGE":
+                            set_text(table_right.cell(r + 1, c), val)
     except: pass
 
     try:
-        chart_shape = slide.shapes[6]
-        left, top, width, height = chart_shape.left, chart_shape.top, chart_shape.width, chart_shape.height
-        
-        img_bytes = fig.to_image(format="png", width=600, height=350)
-        img_buffer = io.BytesIO(img_bytes)
-        
-        sp = chart_shape._element
-        sp.getparent().remove(sp)
-        
-        slide.shapes.add_picture(img_buffer, left, top, width, height)
+        if chart_shape:
+            left, top, width, height = chart_shape.left, chart_shape.top, chart_shape.width, chart_shape.height
+            
+            img_bytes = fig.to_image(format="png", width=600, height=350)
+            img_buffer = io.BytesIO(img_bytes)
+            
+            sp = chart_shape._element
+            sp.getparent().remove(sp)
+            
+            slide.shapes.add_picture(img_buffer, left, top, width, height)
     except Exception as e:
         pass
 
@@ -1222,7 +1230,7 @@ with tab_detail:
                 bench_b100 = (bench_sub / bench_sub.iloc[0]) * 100
                 
                 fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
-                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#e36c09', width=2.0)))
+                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#95b3d7', width=2.0)))
             else:
                 asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
                 fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
@@ -1232,12 +1240,12 @@ with tab_detail:
             
         fig_pres.update_layout(
             title=dict(text="Evolution historique de la performance de l'indice", font=dict(size=14, color='black', family='Arial', weight='bold'), x=0.5),
-            margin=dict(l=40, r=10, t=40, b=40), 
-            height=250, 
+            margin=dict(l=40, r=10, t=40, b=80), 
+            height=280, 
             plot_bgcolor='white', 
             xaxis=dict(showgrid=False, dtick="M12", tickformat="%b-%y", tickangle=-45, tickfont=dict(color='#595959')), 
             yaxis=dict(showgrid=True, gridcolor='#d9d9d9', zeroline=False, dtick=50, tickformat=".2f", tickfont=dict(color='#595959')),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=10))
+            legend=dict(orientation="h", yanchor="top", y=-0.35, xanchor="center", x=0.5, font=dict(size=10))
         )
         st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
         
@@ -1251,7 +1259,121 @@ with tab_detail:
             if pct: return f"{v:.2f}%"
             return f"{v:.2f}"
         
-        st.markdown(f"""
+        def get_bench_perf_ann(days):
+            if benchmark_prices is None or benchmark_prices.empty: return np.nan
+            cutoff = benchmark_prices.index.max() - pd.Timedelta(days=days)
+            p = benchmark_prices[benchmark_prices.index >= cutoff]
+            if len(p) < 2: return np.nan
+            tot = (p.iloc[-1] / p.iloc[0]) - 1
+            years = days/365
+            if years <= 1: return tot * 100
+            return ((1 + tot)**(1/years) - 1) * 100
+
+        def get_bench_vol(days):
+            if benchmark_prices is None or benchmark_prices.empty: return np.nan
+            cutoff = benchmark_prices.index.max() - pd.Timedelta(days=days)
+            p = benchmark_prices[benchmark_prices.index >= cutoff]
+            if len(p) < 2: return np.nan
+            rets = p.pct_change().dropna()
+            return rets.std() * np.sqrt(252) * 100
+            
+        def get_bench_max_drawdown(days):
+            if benchmark_prices is None or benchmark_prices.empty: return np.nan
+            cutoff = benchmark_prices.index.max() - pd.Timedelta(days=days)
+            p = benchmark_prices[benchmark_prices.index >= cutoff]
+            if len(p) < 2: return np.nan
+            roll_max = p.cummax()
+            dd = (p - roll_max) / roll_max
+            return dd.min() * 100
+            
+        def get_bench_sharpe(days):
+            if benchmark_prices is None or benchmark_prices.empty: return np.nan
+            ret = get_bench_perf_ann(days)
+            v = get_bench_vol(days)
+            if pd.isna(ret) or pd.isna(v) or v == 0: return np.nan
+            return ret / v
+            
+        def get_correlation(days):
+            if benchmark_prices is None or benchmark_prices.empty: return np.nan
+            common = asset_prices.index.intersection(benchmark_prices.index)
+            cutoff = common.max() - pd.Timedelta(days=days)
+            common = common[common >= cutoff]
+            if len(common) < 2: return np.nan
+            ret_a = asset_prices.loc[common].pct_change().dropna()
+            ret_b = benchmark_prices.loc[common].pct_change().dropna()
+            if len(ret_a) < 2: return np.nan
+            return ret_a.corr(ret_b) * 100
+
+        if benchmark_prices is not None:
+            bench_perfs = [get_bench_perf_ann(365*10), get_bench_perf_ann(365*5), get_bench_perf_ann(365)]
+            bench_vols = [get_bench_vol(365*10), get_bench_vol(365*5), get_bench_vol(365)]
+            bench_sharpes = [get_bench_sharpe(365*10), get_bench_sharpe(365*5), get_bench_sharpe(365)]
+            bench_drawdowns = [get_bench_max_drawdown(365*10), get_bench_max_drawdown(365*5), get_bench_max_drawdown(365)]
+            corrs = [get_correlation(365*10), get_correlation(365*5), get_correlation(365)]
+
+            table_html = f"""
+<table style="width:100%; font-family:sans-serif; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse; border: none;">
+    <tr>
+        <td style="border:none; width: 16%; background-color: white;"></td>
+        <th colspan="2" style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 28%;">10 ans</th>
+        <th colspan="2" style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 28%;">5 ans</th>
+        <th colspan="2" style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 28%;">1 an</th>
+    </tr>
+    <tr>
+        <td style="border:none; background-color: white;"></td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Performance<br>annualisée</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(perfs[0], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_perfs[0], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(perfs[1], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_perfs[1], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(perfs[2], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_perfs[2], True)}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#f4f5f7; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Volatilité<br>annualisée</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(vols[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_vols[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(vols[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_vols[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(vols[2], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_vols[2], True)}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Sharpe Ratio</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(sharpes[0])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_sharpes[0])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(sharpes[1])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_sharpes[1])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(sharpes[2])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_sharpes[2])}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#f4f5f7; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Max Drawdown</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(drawdowns[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_drawdowns[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(drawdowns[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_drawdowns[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(drawdowns[2], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(bench_drawdowns[2], True)}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Corrélation</td>
+        <td colspan="2" style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(corrs[0], True)}</td>
+        <td colspan="2" style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(corrs[1], True)}</td>
+        <td colspan="2" style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white; font-weight:bold;">{fmt(corrs[2], True)}</td>
+    </tr>
+</table>
+"""
+        else:
+            table_html = f"""
 <table style="width:100%; font-family:sans-serif; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse; border: none;">
     <tr>
         <td style="border:none; width: 25%; background-color: white;"></td>
@@ -1290,7 +1412,8 @@ with tab_detail:
         <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(drawdowns[2], True)}</td>
     </tr>
 </table>
-        """, unsafe_allow_html=True)
+"""
+        st.markdown(table_html, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     with st.spinner("Génération du slide PPTX Client..."):
@@ -1310,14 +1433,27 @@ with tab_detail:
                 (f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A", color_score(note_ecart))
             ]
             
-        df_right = pd.DataFrame({
-            "": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown"],
-            "10 ans": [ticker_disp, fmt(perfs[0], True), fmt(vols[0], True), fmt(sharpes[0]), fmt(drawdowns[0], True)],
-            "5 ans": [ticker_disp, fmt(perfs[1], True), fmt(vols[1], True), fmt(sharpes[1]), fmt(drawdowns[1], True)],
-            "1 an": [ticker_disp, fmt(perfs[2], True), fmt(vols[2], True), fmt(sharpes[2]), fmt(drawdowns[2], True)]
-        })
+        if benchmark_prices is not None:
+            df_right = pd.DataFrame({
+                "C1": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown", "Corrélation"],
+                "C2": [ticker_disp, fmt(perfs[0], True), fmt(vols[0], True), fmt(sharpes[0]), fmt(drawdowns[0], True), fmt(corrs[0], True)],
+                "C3": [str(benchmark_name)[:15], fmt(bench_perfs[0], True), fmt(bench_vols[0], True), fmt(bench_sharpes[0]), fmt(bench_drawdowns[0], True), "MERGE"],
+                "C4": [ticker_disp, fmt(perfs[1], True), fmt(vols[1], True), fmt(sharpes[1]), fmt(drawdowns[1], True), fmt(corrs[1], True)],
+                "C5": [str(benchmark_name)[:15], fmt(bench_perfs[1], True), fmt(bench_vols[1], True), fmt(bench_sharpes[1]), fmt(bench_drawdowns[1], True), "MERGE"],
+                "C6": [ticker_disp, fmt(perfs[2], True), fmt(vols[2], True), fmt(sharpes[2]), fmt(drawdowns[2], True), fmt(corrs[2], True)],
+                "C7": [str(benchmark_name)[:15], fmt(bench_perfs[2], True), fmt(bench_vols[2], True), fmt(bench_sharpes[2]), fmt(bench_drawdowns[2], True), "MERGE"]
+            })
+            tmpl = "template_nexo_benchmark.pptx"
+        else:
+            df_right = pd.DataFrame({
+                "1": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown"],
+                "2": [ticker_disp, fmt(perfs[0], True), fmt(vols[0], True), fmt(sharpes[0]), fmt(drawdowns[0], True)],
+                "3": [ticker_disp, fmt(perfs[1], True), fmt(vols[1], True), fmt(sharpes[1]), fmt(drawdowns[1], True)],
+                "4": [ticker_disp, fmt(perfs[2], True), fmt(vols[2], True), fmt(sharpes[2]), fmt(drawdowns[2], True)]
+            })
+            tmpl = "template_nexo.pptx"
         
-        pptx_buffer = create_nexo_presentation_pptx(asset_name_str, desc, left_data_list, nexo_data_list, df_right, fig_pres)
+        pptx_buffer = create_nexo_presentation_pptx(asset_name_str, desc, left_data_list, nexo_data_list, df_right, fig_pres, template_name=tmpl)
         
     st.download_button(
         label="📥 Télécharger ce Slide en PPTX natif",
