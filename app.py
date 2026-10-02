@@ -136,135 +136,90 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
     return buffer
 
 def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_df, fig):
+    import os, io
+    from pptx import Presentation
+    from pptx.util import Inches
     from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
-    from pptx.util import Pt
-    
+
     def hex_to_rgb(hex_str):
         hex_str = hex_str.lstrip('#')
         if hex_str == "gray": return RGBColor(128, 128, 128)
         return RGBColor(*tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4)))
 
-    prs = Presentation()
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
-    tf = txBox.text_frame
-    tf.text = asset_name
-    tf.paragraphs[0].font.bold = True
-    tf.paragraphs[0].font.size = Pt(22)
-    tf.paragraphs[0].font.name = "Arial"
-    tf.paragraphs[0].font.color.rgb = RGBColor(20, 63, 106) # #143F6A
-    
-    descBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(4.5), Inches(1.5))
-    tf_desc = descBox.text_frame
-    tf_desc.word_wrap = True
-    p = tf_desc.add_paragraph()
-    p.text = desc
-    p.font.size = Pt(11)
-    p.font.name = "Arial"
-    
-    left_table_shape = slide.shapes.add_table(len(left_data), 2, Inches(0.5), Inches(3.0), Inches(4.5), Inches(0.4 * len(left_data))).table
-    for r, row_data in enumerate(left_data):
-        for c, val in enumerate(row_data):
-            cell = left_table_shape.cell(r, c)
-            cell.text = str(val)
-            for paragraph in cell.text_frame.paragraphs:
-                paragraph.font.size = Pt(10)
-                paragraph.font.bold = True
-                paragraph.font.name = "Arial"
-                if c == 0:
-                    paragraph.font.color.rgb = RGBColor(255, 255, 255)
-                else:
-                    paragraph.font.color.rgb = RGBColor(0, 0, 0)
-                    paragraph.alignment = PP_ALIGN.CENTER
-            cell.fill.solid()
-            if c == 0:
-                cell.fill.fore_color.rgb = RGBColor(20, 63, 106)
-            else:
-                cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 0 else RGBColor(244, 245, 247)
-                    
-    if nexo_data:
-        nexo_table_shape = slide.shapes.add_table(3, 3, Inches(0.5), Inches(5.0), Inches(4.5), Inches(1.2)).table
-        cell1 = nexo_table_shape.cell(0, 0)
-        cell2 = nexo_table_shape.cell(0, 2)
-        cell1.merge(cell2)
-        cell1.text = "Score NEXO™"
-        cell1.fill.solid()
-        cell1.fill.fore_color.rgb = RGBColor(20, 63, 106)
-        for p in cell1.text_frame.paragraphs:
-            p.font.color.rgb = RGBColor(255, 255, 255)
-            p.font.bold = True
-            p.font.name = "Arial"
-            p.alignment = PP_ALIGN.CENTER
-            
-        headers = ["Volatilité", "Dividende", "Ecart"]
-        for c, h in enumerate(headers):
-            cell = nexo_table_shape.cell(1, c)
-            cell.text = h
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = RGBColor(133, 169, 255) # #85A9FF
-            for p in cell.text_frame.paragraphs:
-                p.font.color.rgb = RGBColor(0, 0, 0)
-                p.font.bold = True
-                p.font.size = Pt(10)
-                p.font.name = "Arial"
-                p.alignment = PP_ALIGN.CENTER
-                
-        for c, item in enumerate(nexo_data):
-            val, color_hex = item
-            cell = nexo_table_shape.cell(2, c)
-            cell.text = val
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = RGBColor(255, 255, 255)
-            for p in cell.text_frame.paragraphs:
-                p.font.bold = True
-                p.font.size = Pt(14)
-                p.font.name = "Arial"
-                p.font.color.rgb = hex_to_rgb(color_hex)
-                p.alignment = PP_ALIGN.CENTER
+    def set_text(obj, text):
+        tf = getattr(obj, 'text_frame', None)
+        if tf is None: return
+        if not tf.paragraphs: return
+        p = tf.paragraphs[0]
+        if p.runs:
+            p.runs[0].text = str(text)
+            for r in p.runs[1:]: r.text = ''
+        else:
+            p.text = str(text)
+
+    template_path = os.path.join(os.path.dirname(__file__), 'template_nexo.pptx')
+    if not os.path.exists(template_path):
+        prs = Presentation()
+        prs.slides.add_slide(prs.slide_layouts[6])
+        buffer = io.BytesIO()
+        prs.save(buffer)
+        buffer.seek(0)
+        return buffer
+
+    prs = Presentation(template_path)
+    slide = prs.slides[0]
+
+    try: set_text(slide.shapes[1].shapes[0], asset_name)
+    except: pass
+        
+    try: set_text(slide.shapes[2], desc)
+    except: pass
 
     try:
+        table_left = slide.shapes[5].table
+        for r, row_data in enumerate(left_data):
+            for c, val in enumerate(row_data):
+                if r < len(table_left.rows) and c < len(table_left.columns):
+                    set_text(table_left.cell(r, c), val)
+    except: pass
+
+    if nexo_data:
+        try:
+            table_nexo = slide.shapes[8].table
+            for c, item in enumerate(nexo_data):
+                val, color_hex = item
+                if c < len(table_nexo.columns):
+                    cell = table_nexo.cell(2, c)
+                    set_text(cell, val)
+                    if cell.text_frame.paragraphs and cell.text_frame.paragraphs[0].runs:
+                        cell.text_frame.paragraphs[0].runs[0].font.color.rgb = hex_to_rgb(color_hex)
+        except: pass
+
+    try:
+        table_right = slide.shapes[4].table
+        for c, col_name in enumerate(right_df.columns):
+            if c < len(table_right.columns):
+                set_text(table_right.cell(0, c), col_name if col_name else "")
+        rows, cols = right_df.shape
+        for r in range(rows):
+            for c in range(cols):
+                if r + 1 < len(table_right.rows) and c < len(table_right.columns):
+                    set_text(table_right.cell(r + 1, c), right_df.iloc[r, c])
+    except: pass
+
+    try:
+        chart_shape = slide.shapes[6]
+        left, top, width, height = chart_shape.left, chart_shape.top, chart_shape.width, chart_shape.height
+        
         img_bytes = fig.to_image(format="png", width=600, height=350)
         img_buffer = io.BytesIO(img_bytes)
-        slide.shapes.add_picture(img_buffer, Inches(5.2), Inches(1.0), width=Inches(4.5))
+        
+        sp = chart_shape._element
+        sp.getparent().remove(sp)
+        
+        slide.shapes.add_picture(img_buffer, left, top, width, height)
     except Exception as e:
         pass
-        
-    rows, cols = right_df.shape
-    right_table = slide.shapes.add_table(rows + 1, cols, Inches(5.2), Inches(4.5), Inches(4.5), Inches(0.4 * (rows + 1))).table
-    
-    for c, col_name in enumerate(right_df.columns):
-        cell = right_table.cell(0, c)
-        cell.text = str(col_name) if col_name else ""
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = RGBColor(20, 63, 106) if c > 0 else RGBColor(255, 255, 255)
-        for p in cell.text_frame.paragraphs:
-            p.font.color.rgb = RGBColor(255, 255, 255) if c > 0 else RGBColor(0, 0, 0)
-            p.font.bold = True
-            p.font.size = Pt(10)
-            p.font.name = "Arial"
-            p.alignment = PP_ALIGN.CENTER
-
-    for r in range(rows):
-        for c in range(cols):
-            cell = right_table.cell(r + 1, c)
-            cell.text = str(right_df.iloc[r, c])
-            cell.fill.solid()
-            if r == 0:
-                cell.fill.fore_color.rgb = RGBColor(133, 169, 255) if c > 0 else RGBColor(255, 255, 255)
-            else:
-                cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 1 else RGBColor(244, 245, 247)
-            
-            for p in cell.text_frame.paragraphs:
-                p.font.color.rgb = RGBColor(0, 0, 0)
-                p.font.size = Pt(10)
-                p.font.name = "Arial"
-                if c == 0:
-                    p.font.bold = True
-                    p.alignment = PP_ALIGN.LEFT
-                else:
-                    p.alignment = PP_ALIGN.CENTER
 
     buffer = io.BytesIO()
     prs.save(buffer)
