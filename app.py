@@ -1071,10 +1071,15 @@ with tab_detail:
         benchmark_name = st.selectbox("Sélectionnez un benchmark pour le graphique :", options=["Aucun"] + sorted(asset_options.keys()), index=0, key="pres_benchmark")
         
     benchmark_prices = None
+    bench_ticker_disp = str(benchmark_name)[:15] if benchmark_name != "Aucun" else ""
     if benchmark_name != "Aucun":
         bench_id = asset_options[benchmark_name]
         if bench_id in prices_pivot.columns:
             benchmark_prices = prices_pivot[bench_id].dropna()
+            bench_info = assets_df[assets_df['asset_id'] == bench_id].iloc[0]
+            bt = str(bench_info.get('ticker_bloomberg', benchmark_name))
+            if pd.notna(bt) and bt.strip() != 'nan':
+                bench_ticker_disp = bt
 
     st.markdown(f"<h4 style='color: #003366; margin-bottom: 30px;'>{asset_name_str}</h4>", unsafe_allow_html=True)
     
@@ -1153,24 +1158,25 @@ with tab_detail:
             desc = "Description de l'actif non disponible."
         st.markdown(f"<p style='font-size: 13px; text-align: justify; margin-bottom: 25px;'>{desc}</p>", unsafe_allow_html=True)
         
-        div_val_pct = f"{float(div_2025)*100:.2f}%" if pd.notna(div_2025) else "N/A"
+        div_val_pct = f"{float(div_2025)*100:.2f}%".replace('.', ',') if pd.notna(div_2025) else "N/A"
         date_str = current_date.strftime('%d/%m/%Y')
+        curr_price_str = f"{current_price:.2f}".replace('.', ',') + " pts"
         
         if dec_val is not None:
-            dec_val_pct = f"{dec_yield_pct:.2f}%" if dec_yield_pct != "N/A" else "N/A"
+            dec_val_pct = f"{dec_yield_pct:.2f}%".replace('.', ',') if dec_yield_pct != "N/A" else "N/A"
             table_rows = (
-                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'actif au {date_str}</td>"
-                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{current_price:.2f}</td></tr>\n"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'indice au {date_str}</td>"
+                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{curr_price_str}</td></tr>\n"
                 f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de décrément au {date_str}</td>"
                 f"<td style='background-color:#f4f5f7; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{dec_val_pct}</td></tr>\n"
-                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende estimé (réinvesti)</td>"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende 2025 avec effet de réinvestissement</td>"
                 f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{div_val_pct}</td></tr>"
             )
         else:
             table_rows = (
-                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'actif au {date_str}</td>"
-                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{current_price:.2f}</td></tr>\n"
-                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende estimé</td>"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'indice au {date_str}</td>"
+                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{curr_price_str}</td></tr>\n"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende 2025</td>"
                 f"<td style='background-color:#f4f5f7; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{div_val_pct}</td></tr>"
             )
             
@@ -1230,7 +1236,7 @@ with tab_detail:
                 bench_b100 = (bench_sub / bench_sub.iloc[0]) * 100
                 
                 fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
-                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#95b3d7', width=2.0)))
+                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=bench_ticker_disp, line=dict(color='#95b3d7', width=2.0)))
             else:
                 asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
                 fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
@@ -1322,11 +1328,11 @@ with tab_detail:
     <tr>
         <td style="border:none; background-color: white;"></td>
         <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
-        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{bench_ticker_disp}</td>
         <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
-        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{bench_ticker_disp}</td>
         <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{ticker_disp}</td>
-        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{str(benchmark_name)[:15]}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 14%;">{bench_ticker_disp}</td>
     </tr>
     <tr>
         <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Performance<br>annualisée</td>
@@ -1418,12 +1424,12 @@ with tab_detail:
     st.markdown("<br>", unsafe_allow_html=True)
     with st.spinner("Génération du slide PPTX Client..."):
         left_data_list = []
-        left_data_list.append([f"Niveau de l'actif au {date_str}", f"{current_price:.2f}"])
+        left_data_list.append([f"Niveau de l'indice au {date_str}", curr_price_str])
         if dec_val is not None:
             left_data_list.append([f"Taux de décrément au {date_str}", f"{dec_val_pct}"])
-            left_data_list.append(["Taux de dividende estimé (réinvesti)", f"{div_val_pct}"])
+            left_data_list.append(["Taux de dividende 2025 avec effet de réinvestissement", f"{div_val_pct}"])
         else:
-            left_data_list.append(["Taux de dividende estimé", f"{div_val_pct}"])
+            left_data_list.append(["Taux de dividende 2025", f"{div_val_pct}"])
             
         nexo_data_list = None
         if dec_val is not None:
@@ -1437,11 +1443,11 @@ with tab_detail:
             df_right = pd.DataFrame({
                 "C1": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown", "Corrélation"],
                 "C2": [ticker_disp, fmt(perfs[0], True), fmt(vols[0], True), fmt(sharpes[0]), fmt(drawdowns[0], True), fmt(corrs[0], True)],
-                "C3": [str(benchmark_name)[:15], fmt(bench_perfs[0], True), fmt(bench_vols[0], True), fmt(bench_sharpes[0]), fmt(bench_drawdowns[0], True), "MERGE"],
+                "C3": [bench_ticker_disp, fmt(bench_perfs[0], True), fmt(bench_vols[0], True), fmt(bench_sharpes[0]), fmt(bench_drawdowns[0], True), "MERGE"],
                 "C4": [ticker_disp, fmt(perfs[1], True), fmt(vols[1], True), fmt(sharpes[1]), fmt(drawdowns[1], True), fmt(corrs[1], True)],
-                "C5": [str(benchmark_name)[:15], fmt(bench_perfs[1], True), fmt(bench_vols[1], True), fmt(bench_sharpes[1]), fmt(bench_drawdowns[1], True), "MERGE"],
+                "C5": [bench_ticker_disp, fmt(bench_perfs[1], True), fmt(bench_vols[1], True), fmt(bench_sharpes[1]), fmt(bench_drawdowns[1], True), "MERGE"],
                 "C6": [ticker_disp, fmt(perfs[2], True), fmt(vols[2], True), fmt(sharpes[2]), fmt(drawdowns[2], True), fmt(corrs[2], True)],
-                "C7": [str(benchmark_name)[:15], fmt(bench_perfs[2], True), fmt(bench_vols[2], True), fmt(bench_sharpes[2]), fmt(bench_drawdowns[2], True), "MERGE"]
+                "C7": [bench_ticker_disp, fmt(bench_perfs[2], True), fmt(bench_vols[2], True), fmt(bench_sharpes[2]), fmt(bench_drawdowns[2], True), "MERGE"]
             })
             tmpl = "template_nexo_benchmark.pptx"
         else:
