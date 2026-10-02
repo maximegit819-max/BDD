@@ -153,7 +153,8 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
     tf.text = asset_name
     tf.paragraphs[0].font.bold = True
     tf.paragraphs[0].font.size = Pt(22)
-    tf.paragraphs[0].font.color.rgb = RGBColor(0, 51, 102)
+    tf.paragraphs[0].font.name = "Arial"
+    tf.paragraphs[0].font.color.rgb = RGBColor(20, 63, 106) # #143F6A
     
     descBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(4.5), Inches(1.5))
     tf_desc = descBox.text_frame
@@ -161,6 +162,7 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
     p = tf_desc.add_paragraph()
     p.text = desc
     p.font.size = Pt(11)
+    p.font.name = "Arial"
     
     left_table_shape = slide.shapes.add_table(len(left_data), 2, Inches(0.5), Inches(3.0), Inches(4.5), Inches(0.4 * len(left_data))).table
     for r, row_data in enumerate(left_data):
@@ -170,6 +172,7 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
             for paragraph in cell.text_frame.paragraphs:
                 paragraph.font.size = Pt(10)
                 paragraph.font.bold = True
+                paragraph.font.name = "Arial"
                 if c == 0:
                     paragraph.font.color.rgb = RGBColor(255, 255, 255)
                 else:
@@ -177,7 +180,7 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
                     paragraph.alignment = PP_ALIGN.CENTER
             cell.fill.solid()
             if c == 0:
-                cell.fill.fore_color.rgb = RGBColor(0, 51, 102)
+                cell.fill.fore_color.rgb = RGBColor(20, 63, 106)
             else:
                 cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 0 else RGBColor(244, 245, 247)
                     
@@ -188,10 +191,11 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
         cell1.merge(cell2)
         cell1.text = "Score NEXO™"
         cell1.fill.solid()
-        cell1.fill.fore_color.rgb = RGBColor(0, 51, 102)
+        cell1.fill.fore_color.rgb = RGBColor(20, 63, 106)
         for p in cell1.text_frame.paragraphs:
             p.font.color.rgb = RGBColor(255, 255, 255)
             p.font.bold = True
+            p.font.name = "Arial"
             p.alignment = PP_ALIGN.CENTER
             
         headers = ["Volatilité", "Dividende", "Ecart"]
@@ -199,11 +203,12 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
             cell = nexo_table_shape.cell(1, c)
             cell.text = h
             cell.fill.solid()
-            cell.fill.fore_color.rgb = RGBColor(28, 75, 120)
+            cell.fill.fore_color.rgb = RGBColor(133, 169, 255) # #85A9FF
             for p in cell.text_frame.paragraphs:
-                p.font.color.rgb = RGBColor(255, 255, 255)
+                p.font.color.rgb = RGBColor(0, 0, 0)
                 p.font.bold = True
                 p.font.size = Pt(10)
+                p.font.name = "Arial"
                 p.alignment = PP_ALIGN.CENTER
                 
         for c, item in enumerate(nexo_data):
@@ -215,6 +220,7 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
             for p in cell.text_frame.paragraphs:
                 p.font.bold = True
                 p.font.size = Pt(14)
+                p.font.name = "Arial"
                 p.font.color.rgb = hex_to_rgb(color_hex)
                 p.alignment = PP_ALIGN.CENTER
 
@@ -232,11 +238,12 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
         cell = right_table.cell(0, c)
         cell.text = str(col_name) if col_name else ""
         cell.fill.solid()
-        cell.fill.fore_color.rgb = RGBColor(0, 51, 102) if c > 0 else RGBColor(255, 255, 255)
+        cell.fill.fore_color.rgb = RGBColor(20, 63, 106) if c > 0 else RGBColor(255, 255, 255)
         for p in cell.text_frame.paragraphs:
             p.font.color.rgb = RGBColor(255, 255, 255) if c > 0 else RGBColor(0, 0, 0)
             p.font.bold = True
             p.font.size = Pt(10)
+            p.font.name = "Arial"
             p.alignment = PP_ALIGN.CENTER
 
     for r in range(rows):
@@ -244,11 +251,15 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
             cell = right_table.cell(r + 1, c)
             cell.text = str(right_df.iloc[r, c])
             cell.fill.solid()
-            cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 0 else RGBColor(244, 245, 247)
+            if r == 0:
+                cell.fill.fore_color.rgb = RGBColor(133, 169, 255) if c > 0 else RGBColor(255, 255, 255)
+            else:
+                cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 1 else RGBColor(244, 245, 247)
             
             for p in cell.text_frame.paragraphs:
                 p.font.color.rgb = RGBColor(0, 0, 0)
                 p.font.size = Pt(10)
+                p.font.name = "Arial"
                 if c == 0:
                     p.font.bold = True
                     p.alignment = PP_ALIGN.LEFT
@@ -1263,8 +1274,8 @@ with tab_detail:
             fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
             
         fig_pres.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=200, plot_bgcolor='white', 
-                               xaxis=dict(showgrid=True, gridcolor='#f0f0f0', dtick="M24", tickformat="%b-%y"), 
-                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False),
+                               xaxis=dict(showgrid=True, gridcolor='#f0f0f0', dtick="M6", tickformat="%b %y", title="Mois-Année"), 
+                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False, dtick=50, title="Cours"),
                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)))
         st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
         
