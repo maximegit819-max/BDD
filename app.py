@@ -1048,38 +1048,43 @@ with tab_detail:
         
         if dec_val is not None:
             dec_val_pct = f"{dec_yield_pct:.2f}%" if dec_yield_pct != "N/A" else "N/A"
-            table_rows = f"""
-            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Niveau de l'actif au {date_str}</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{current_price:.2f}</td></tr>
-            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de décrément au {date_str}</td><td style="background-color:#f4f5f7; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{dec_val_pct}</td></tr>
-            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de dividende estimé (réinvesti)</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{div_val_pct}</td></tr>
-            """
+            table_rows = (
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'actif au {date_str}</td>"
+                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{current_price:.2f}</td></tr>\n"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de décrément au {date_str}</td>"
+                f"<td style='background-color:#f4f5f7; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{dec_val_pct}</td></tr>\n"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende estimé (réinvesti)</td>"
+                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{div_val_pct}</td></tr>"
+            )
         else:
-            table_rows = f"""
-            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Niveau de l'actif au {date_str}</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{current_price:.2f}</td></tr>
-            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de dividende estimé</td><td style="background-color:#f4f5f7; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{div_val_pct}</td></tr>
-            """
+            table_rows = (
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Niveau de l'actif au {date_str}</td>"
+                f"<td style='background-color:#e6e9ed; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{current_price:.2f}</td></tr>\n"
+                f"<tr><td style='background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;'>Taux de dividende estimé</td>"
+                f"<td style='background-color:#f4f5f7; color:black; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;'>{div_val_pct}</td></tr>"
+            )
             
         st.markdown(f"""
-        <table style="width:100%; font-size:13px; margin-bottom: 30px; border-collapse: collapse;">
-            {table_rows}
-        </table>
+<table style="width:100%; font-family:sans-serif; font-size:13px; margin-bottom: 30px; border-collapse: collapse; border: none;">
+{table_rows}
+</table>
         """, unsafe_allow_html=True)
         
         if dec_val is not None:
             st.markdown("""
-            <table style="width:100%; font-size:13px; text-align:center; border-collapse: collapse;">
-                <tr><th colspan="3" style="background-color:#003366; color:white; padding:8px; border: 1px solid white;">Score NEXO™</th></tr>
-                <tr>
-                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Volatilité</td>
-                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Dividende</td>
-                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Ecart</td>
-                </tr>
-                <tr>
-                    <td style="padding:12px; font-weight:bold; color:{color_vol}; font-size:16px; border: 1px solid #e6e9ed;">{vol_text}</td>
-                    <td style="padding:12px; font-weight:bold; color:{color_yield}; font-size:16px; border: 1px solid #e6e9ed;">{yield_text}</td>
-                    <td style="padding:12px; font-weight:bold; color:{color_ecart}; font-size:16px; border: 1px solid #e6e9ed;">{ecart_text}</td>
-                </tr>
-            </table>
+<table style="width:100%; font-family:sans-serif; font-size:13px; text-align:center; border-collapse: collapse; border: none;">
+    <tr><th colspan="3" style="background-color:#003366; color:white; padding:8px; border: 1px solid white;">Score NEXO™</th></tr>
+    <tr>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Volatilité</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Dividende</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Ecart</td>
+    </tr>
+    <tr>
+        <td style="padding:12px; font-weight:bold; color:{color_vol}; background-color:white; font-size:16px; border: 1px solid #e6e9ed;">{vol_text}</td>
+        <td style="padding:12px; font-weight:bold; color:{color_yield}; background-color:white; font-size:16px; border: 1px solid #e6e9ed;">{yield_text}</td>
+        <td style="padding:12px; font-weight:bold; color:{color_ecart}; background-color:white; font-size:16px; border: 1px solid #e6e9ed;">{ecart_text}</td>
+    </tr>
+</table>
             """.format(
                 color_vol=color_score(note_vol), vol_text=f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A",
                 color_yield=color_score(note_yield), yield_text=f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A",
@@ -1120,44 +1125,44 @@ with tab_detail:
         if pd.isna(ticker_disp) or ticker_disp.strip() == 'nan': ticker_disp = 'Actif'
         
         st.markdown(f"""
-        <table style="width:100%; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse;">
-            <tr>
-                <td style="border:none; width: 25%;"></td>
-                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">10 ans</th>
-                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">5 ans</th>
-                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">1 an</th>
-            </tr>
-            <tr>
-                <td style="border:none;"></td>
-                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
-                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
-                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
-            </tr>
-            <tr>
-                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Performance<br>annualisée</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[0], True)}</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[1], True)}</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[2], True)}</td>
-            </tr>
-            <tr>
-                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Volatilité<br>annualisée</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[0], True)}</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[1], True)}</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[2], True)}</td>
-            </tr>
-            <tr>
-                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Sharpe Ratio</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[0])}</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[1])}</td>
-                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[2])}</td>
-            </tr>
-            <tr>
-                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Max Drawdown</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[0], True)}</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[1], True)}</td>
-                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[2], True)}</td>
-            </tr>
-        </table>
+<table style="width:100%; font-family:sans-serif; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse; border: none;">
+    <tr>
+        <td style="border:none; width: 25%; background-color: white;"></td>
+        <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">10 ans</th>
+        <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">5 ans</th>
+        <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">1 an</th>
+    </tr>
+    <tr>
+        <td style="border:none; background-color: white;"></td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Performance<br>annualisée</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(perfs[0], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(perfs[1], True)}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(perfs[2], True)}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#f4f5f7; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Volatilité<br>annualisée</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(vols[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(vols[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(vols[2], True)}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#e6e9ed; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Sharpe Ratio</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(sharpes[0])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(sharpes[1])}</td>
+        <td style="background-color:#e6e9ed; color:black; padding:6px; border: 1px solid white;">{fmt(sharpes[2])}</td>
+    </tr>
+    <tr>
+        <td style="background-color:#f4f5f7; color:black; font-weight:bold; padding:6px; border: 1px solid white; text-align:left;">Max Drawdown</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(drawdowns[0], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(drawdowns[1], True)}</td>
+        <td style="background-color:#f4f5f7; color:black; padding:6px; border: 1px solid white;">{fmt(drawdowns[2], True)}</td>
+    </tr>
+</table>
         """, unsafe_allow_html=True)
 
     st.divider()
