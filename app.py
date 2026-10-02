@@ -135,6 +135,131 @@ def create_pptx_report(dfs_dict, figs_dict, title="Rapport"):
     buffer.seek(0)
     return buffer
 
+def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_df, fig):
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Pt
+    
+    def hex_to_rgb(hex_str):
+        hex_str = hex_str.lstrip('#')
+        if hex_str == "gray": return RGBColor(128, 128, 128)
+        return RGBColor(*tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4)))
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+    tf = txBox.text_frame
+    tf.text = asset_name
+    tf.paragraphs[0].font.bold = True
+    tf.paragraphs[0].font.size = Pt(22)
+    tf.paragraphs[0].font.color.rgb = RGBColor(0, 51, 102)
+    
+    descBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(4.5), Inches(1.5))
+    tf_desc = descBox.text_frame
+    tf_desc.word_wrap = True
+    p = tf_desc.add_paragraph()
+    p.text = desc
+    p.font.size = Pt(11)
+    
+    left_table_shape = slide.shapes.add_table(len(left_data), 2, Inches(0.5), Inches(3.0), Inches(4.5), Inches(0.4 * len(left_data))).table
+    for r, row_data in enumerate(left_data):
+        for c, val in enumerate(row_data):
+            cell = left_table_shape.cell(r, c)
+            cell.text = str(val)
+            for paragraph in cell.text_frame.paragraphs:
+                paragraph.font.size = Pt(10)
+                paragraph.font.bold = True
+                if c == 0:
+                    paragraph.font.color.rgb = RGBColor(255, 255, 255)
+                else:
+                    paragraph.font.color.rgb = RGBColor(0, 0, 0)
+                    paragraph.alignment = PP_ALIGN.CENTER
+            cell.fill.solid()
+            if c == 0:
+                cell.fill.fore_color.rgb = RGBColor(0, 51, 102)
+            else:
+                cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 0 else RGBColor(244, 245, 247)
+                    
+    if nexo_data:
+        nexo_table_shape = slide.shapes.add_table(3, 3, Inches(0.5), Inches(5.0), Inches(4.5), Inches(1.2)).table
+        cell1 = nexo_table_shape.cell(0, 0)
+        cell2 = nexo_table_shape.cell(0, 2)
+        cell1.merge(cell2)
+        cell1.text = "Score NEXO™"
+        cell1.fill.solid()
+        cell1.fill.fore_color.rgb = RGBColor(0, 51, 102)
+        for p in cell1.text_frame.paragraphs:
+            p.font.color.rgb = RGBColor(255, 255, 255)
+            p.font.bold = True
+            p.alignment = PP_ALIGN.CENTER
+            
+        headers = ["Volatilité", "Dividende", "Ecart"]
+        for c, h in enumerate(headers):
+            cell = nexo_table_shape.cell(1, c)
+            cell.text = h
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(28, 75, 120)
+            for p in cell.text_frame.paragraphs:
+                p.font.color.rgb = RGBColor(255, 255, 255)
+                p.font.bold = True
+                p.font.size = Pt(10)
+                p.alignment = PP_ALIGN.CENTER
+                
+        for c, item in enumerate(nexo_data):
+            val, color_hex = item
+            cell = nexo_table_shape.cell(2, c)
+            cell.text = val
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(255, 255, 255)
+            for p in cell.text_frame.paragraphs:
+                p.font.bold = True
+                p.font.size = Pt(14)
+                p.font.color.rgb = hex_to_rgb(color_hex)
+                p.alignment = PP_ALIGN.CENTER
+
+    try:
+        img_bytes = fig.to_image(format="png", width=600, height=350)
+        img_buffer = io.BytesIO(img_bytes)
+        slide.shapes.add_picture(img_buffer, Inches(5.2), Inches(1.0), width=Inches(4.5))
+    except Exception as e:
+        pass
+        
+    rows, cols = right_df.shape
+    right_table = slide.shapes.add_table(rows + 1, cols, Inches(5.2), Inches(4.5), Inches(4.5), Inches(0.4 * (rows + 1))).table
+    
+    for c, col_name in enumerate(right_df.columns):
+        cell = right_table.cell(0, c)
+        cell.text = str(col_name) if col_name else ""
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = RGBColor(0, 51, 102) if c > 0 else RGBColor(255, 255, 255)
+        for p in cell.text_frame.paragraphs:
+            p.font.color.rgb = RGBColor(255, 255, 255) if c > 0 else RGBColor(0, 0, 0)
+            p.font.bold = True
+            p.font.size = Pt(10)
+            p.alignment = PP_ALIGN.CENTER
+
+    for r in range(rows):
+        for c in range(cols):
+            cell = right_table.cell(r + 1, c)
+            cell.text = str(right_df.iloc[r, c])
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(230, 233, 237) if r % 2 == 0 else RGBColor(244, 245, 247)
+            
+            for p in cell.text_frame.paragraphs:
+                p.font.color.rgb = RGBColor(0, 0, 0)
+                p.font.size = Pt(10)
+                if c == 0:
+                    p.font.bold = True
+                    p.alignment = PP_ALIGN.LEFT
+                else:
+                    p.alignment = PP_ALIGN.CENTER
+
+    buffer = io.BytesIO()
+    prs.save(buffer)
+    buffer.seek(0)
+    return buffer
+
 # 2. Récupération et mise en cache des données
 @st.cache_data(ttl=3600*24)
 def load_assets():
@@ -963,9 +1088,20 @@ with tab_detail:
         else:
             st.warning("L'actif sélectionné n'a pas de données sur la dernière année.")
 
-    # --- PRÉSENTATION CLIENT NEXO (En bas de page) ---
     st.divider()
+    
     st.markdown(f"<h2 style='text-align: left; color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px;'>PRÉSENTATION DE L'ACTIF</h2>", unsafe_allow_html=True)
+    
+    col_bench, _ = st.columns([1, 2])
+    with col_bench:
+        benchmark_name = st.selectbox("Sélectionnez un benchmark pour le graphique :", options=["Aucun"] + sorted(asset_options.keys()), index=0, key="pres_benchmark")
+        
+    benchmark_prices = None
+    if benchmark_name != "Aucun":
+        bench_id = asset_options[benchmark_name]
+        if bench_id in prices_pivot.columns:
+            benchmark_prices = prices_pivot[bench_id].dropna()
+
     st.markdown(f"<h4 style='color: #003366; margin-bottom: 30px;'>{asset_name_str}</h4>", unsafe_allow_html=True)
     
     # Fonctions pour la présentation
@@ -1103,12 +1239,33 @@ with tab_detail:
             """, unsafe_allow_html=True)
         
     with pres_col2:
-        st.markdown("<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>Evolution historique de la performance</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>Evolution historique de la performance (Base 100)</div>", unsafe_allow_html=True)
         fig_pres = go.Figure()
-        fig_pres.add_trace(go.Scatter(x=asset_prices.index, y=asset_prices, mode='lines', line=dict(color='#4c619b', width=2.5)))
-        fig_pres.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=200, plot_bgcolor='white', 
+        
+        ticker_disp = str(asset_info.get('ticker_bloomberg', 'Actif'))
+        if pd.isna(ticker_disp) or ticker_disp.strip() == 'nan': ticker_disp = 'Actif'
+        
+        if benchmark_prices is not None:
+            common_idx = asset_prices.index.intersection(benchmark_prices.index)
+            if len(common_idx) > 0:
+                asset_sub = asset_prices.loc[common_idx]
+                bench_sub = benchmark_prices.loc[common_idx]
+                asset_b100 = (asset_sub / asset_sub.iloc[0]) * 100
+                bench_b100 = (bench_sub / bench_sub.iloc[0]) * 100
+                
+                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
+                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#ff9900', width=2.0)))
+            else:
+                asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
+                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
+        else:
+            asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
+            fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
+            
+        fig_pres.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=200, plot_bgcolor='white', 
                                xaxis=dict(showgrid=True, gridcolor='#f0f0f0', dtick="M24", tickformat="%b-%y"), 
-                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False))
+                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False),
+                               legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)))
         st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
         
         perfs = [get_perf_ann(365*10), get_perf_ann(365*5), get_perf(365)]
@@ -1120,9 +1277,6 @@ with tab_detail:
             if pd.isna(v): return "N/A"
             if pct: return f"{v:.2f}%"
             return f"{v:.2f}"
-        
-        ticker_disp = str(asset_info.get('ticker_bloomberg', 'Actif'))
-        if pd.isna(ticker_disp) or ticker_disp.strip() == 'nan': ticker_disp = 'Actif'
         
         st.markdown(f"""
 <table style="width:100%; font-family:sans-serif; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse; border: none;">
@@ -1164,6 +1318,41 @@ with tab_detail:
     </tr>
 </table>
         """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.spinner("Génération du slide PPTX Client..."):
+        left_data_list = []
+        left_data_list.append([f"Niveau de l'actif au {date_str}", f"{current_price:.2f}"])
+        if dec_val is not None:
+            left_data_list.append([f"Taux de décrément au {date_str}", f"{dec_val_pct}"])
+            left_data_list.append(["Taux de dividende estimé (réinvesti)", f"{div_val_pct}"])
+        else:
+            left_data_list.append(["Taux de dividende estimé", f"{div_val_pct}"])
+            
+        nexo_data_list = None
+        if dec_val is not None:
+            nexo_data_list = [
+                (f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A", color_score(note_vol)),
+                (f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A", color_score(note_yield)),
+                (f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A", color_score(note_ecart))
+            ]
+            
+        df_right = pd.DataFrame({
+            "": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown"],
+            "10 ans": [ticker_disp, fmt(perfs[0], True), fmt(vols[0], True), fmt(sharpes[0]), fmt(drawdowns[0], True)],
+            "5 ans": [ticker_disp, fmt(perfs[1], True), fmt(vols[1], True), fmt(sharpes[1]), fmt(drawdowns[1], True)],
+            "1 an": [ticker_disp, fmt(perfs[2], True), fmt(vols[2], True), fmt(sharpes[2]), fmt(drawdowns[2], True)]
+        })
+        
+        pptx_buffer = create_nexo_presentation_pptx(asset_name_str, desc, left_data_list, nexo_data_list, df_right, fig_pres)
+        
+    st.download_button(
+        label="📥 Télécharger ce Slide en PPTX natif",
+        data=pptx_buffer,
+        file_name=f"Presentation_Client_{selected_asset_name}.pptx",
+        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        use_container_width=True
+    )
 
     st.divider()
     st.subheader("Exporter le rapport Détaillé")
