@@ -791,53 +791,7 @@ with tab_detail:
     asset_name_str = str(asset_info.get('name', ''))
     dec_val, dec_type = extract_decrement(asset_name_str)
     
-    if dec_val is not None:
-        import math
-        st.subheader("Scoring Nexo")
-        
-        # 1. Note Yield
-        note_yield = "N/A"
-        if pd.notna(current_price):
-            try:
-                note_yield = 5 / (1 + math.exp(0.02 * (850 - current_price)))
-            except: pass
-            
-        # 2. Note Volatilité
-        note_vol = "N/A"
-        vol_1y = get_vol(days=365)
-        vol_5y = get_vol(days=365*5)
-        if pd.notna(vol_1y) and pd.notna(vol_5y):
-            try:
-                avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
-                note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
-            except: pass
-            
-        # 3. Note Ecart
-        note_ecart = "N/A"
-        div_2025 = asset_info.get('dividend_yield')
-        if pd.notna(div_2025) and pd.notna(current_price) and current_price > 0:
-            try:
-                if dec_type == 'PERCENT':
-                    dec_yield = dec_val / 100.0
-                else:
-                    dec_yield = dec_val / current_price
-                ecart = float(div_2025) - dec_yield
-                note_ecart = 5 / (1 + math.exp(-150 * (ecart + 0.025)))
-            except: pass
-            
-        # Score Total
-        score_total = "N/A"
-        if note_yield != "N/A" and note_vol != "N/A" and note_ecart != "N/A":
-            score_total = note_yield + note_vol + note_ecart
-            
-        # Affichage
-        sc1, sc2, sc3, sc4 = st.columns(4)
-        sc1.metric("Score Total (/15)", f"{score_total:.2f}" if score_total != "N/A" else "N/A")
-        sc2.metric("Note Yield (/5)", f"{note_yield:.2f}" if note_yield != "N/A" else "N/A")
-        sc3.metric("Note Ecart (/5)", f"{note_ecart:.2f}" if note_ecart != "N/A" else "N/A")
-        sc4.metric("Note Volatilité (/5)", f"{note_vol:.2f}" if note_vol != "N/A" else "N/A")
-        
-        st.divider()
+
 
     # --- 2. Tableaux Perf / Vol / Bêta ---
     st.subheader(f"Performances et Risques (Dernier cours : {current_price:.2f})")
@@ -1008,6 +962,203 @@ with tab_detail:
                 st.info("Pas assez de données pour calculer les corrélations sur cet univers.")
         else:
             st.warning("L'actif sélectionné n'a pas de données sur la dernière année.")
+
+    # --- PRÉSENTATION CLIENT NEXO (En bas de page) ---
+    st.divider()
+    st.markdown(f"<h2 style='text-align: left; color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px;'>PRÉSENTATION DE L'ACTIF</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='color: #003366; margin-bottom: 30px;'>{asset_name_str}</h4>", unsafe_allow_html=True)
+    
+    # Fonctions pour la présentation
+    def get_perf_ann(days):
+        if len(asset_prices) == 0: return np.nan
+        start_date = current_date - pd.Timedelta(days=days)
+        sub = asset_prices[asset_prices.index >= start_date]
+        if len(sub) == 0: return np.nan
+        old_price = sub.iloc[0]
+        years = days / 365.25
+        if old_price <= 0: return np.nan
+        return ((current_price / old_price) ** (1 / years) - 1) * 100
+
+    def get_max_drawdown(days):
+        start_date = current_date - pd.Timedelta(days=days)
+        sub = asset_prices[asset_prices.index >= start_date]
+        if len(sub) == 0: return np.nan
+        roll_max = sub.cummax()
+        drawdown = sub / roll_max - 1.0
+        return drawdown.min() * 100
+
+    def get_sharpe(days):
+        perf = get_perf_ann(days) if days > 365 else get_perf(days=days)
+        vol = get_vol(days)
+        if pd.isna(perf) or pd.isna(vol) or vol == 0: return np.nan
+        return perf / vol
+        
+    def color_score(score):
+        if score == "N/A": return "gray"
+        if score >= 4: return "#28a745"
+        if score >= 3: return "#85c13f"
+        if score >= 2: return "#ffc107"
+        if score >= 1: return "#fd7e14"
+        return "#dc3545"
+
+    # Notes S-Curve (Uniquement si décrément)
+    import math
+    note_yield = "N/A"
+    note_vol = "N/A"
+    note_ecart = "N/A"
+    dec_yield_pct = "N/A"
+    div_2025 = asset_info.get('dividend_yield')
+    
+    if dec_val is not None and pd.notna(current_price) and current_price > 0:
+        try: note_yield = 5 / (1 + math.exp(0.02 * (850 - current_price)))
+        except: pass
+        
+        vol_1y = get_vol(days=365)
+        vol_5y = get_vol(days=365*5)
+        if pd.notna(vol_1y) and pd.notna(vol_5y):
+            try:
+                avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
+                note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
+            except: pass
+            
+        if dec_type == 'PERCENT':
+            dec_yield = dec_val / 100.0
+            dec_yield_pct = dec_val
+        else:
+            dec_yield = dec_val / current_price
+            dec_yield_pct = dec_yield * 100
+            
+        if pd.notna(div_2025):
+            try:
+                ecart = float(div_2025) - dec_yield
+                note_ecart = 5 / (1 + math.exp(-150 * (ecart + 0.025)))
+            except: pass
+
+    pres_col1, pres_col2 = st.columns([1, 1], gap="large")
+    
+    with pres_col1:
+        desc = str(asset_info.get('construction', '')) + " " + str(asset_info.get('specificities', ''))
+        desc = desc.strip()
+        if not desc or desc == "N/A N/A" or desc == "nan nan":
+            desc = "Description de l'actif non disponible."
+        st.markdown(f"<p style='font-size: 13px; text-align: justify; margin-bottom: 25px;'>{desc}</p>", unsafe_allow_html=True)
+        
+        div_val_pct = f"{float(div_2025)*100:.2f}%" if pd.notna(div_2025) else "N/A"
+        date_str = current_date.strftime('%d/%m/%Y')
+        
+        if dec_val is not None:
+            dec_val_pct = f"{dec_yield_pct:.2f}%" if dec_yield_pct != "N/A" else "N/A"
+            table_rows = f"""
+            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Niveau de l'actif au {date_str}</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{current_price:.2f}</td></tr>
+            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de décrément au {date_str}</td><td style="background-color:#f4f5f7; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{dec_val_pct}</td></tr>
+            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de dividende estimé (réinvesti)</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{div_val_pct}</td></tr>
+            """
+        else:
+            table_rows = f"""
+            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Niveau de l'actif au {date_str}</td><td style="background-color:#e6e9ed; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{current_price:.2f}</td></tr>
+            <tr><td style="background-color:#003366; color:white; padding:10px; font-weight:bold; border: 1px solid white;">Taux de dividende estimé</td><td style="background-color:#f4f5f7; padding:10px; text-align:center; font-weight:bold; border: 1px solid white;">{div_val_pct}</td></tr>
+            """
+            
+        st.markdown(f"""
+        <table style="width:100%; font-size:13px; margin-bottom: 30px; border-collapse: collapse;">
+            {table_rows}
+        </table>
+        """, unsafe_allow_html=True)
+        
+        if dec_val is not None:
+            st.markdown("""
+            <table style="width:100%; font-size:13px; text-align:center; border-collapse: collapse;">
+                <tr><th colspan="3" style="background-color:#003366; color:white; padding:8px; border: 1px solid white;">Score NEXO™</th></tr>
+                <tr>
+                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Volatilité</td>
+                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Dividende</td>
+                    <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Ecart</td>
+                </tr>
+                <tr>
+                    <td style="padding:12px; font-weight:bold; color:{color_vol}; font-size:16px; border: 1px solid #e6e9ed;">{vol_text}</td>
+                    <td style="padding:12px; font-weight:bold; color:{color_yield}; font-size:16px; border: 1px solid #e6e9ed;">{yield_text}</td>
+                    <td style="padding:12px; font-weight:bold; color:{color_ecart}; font-size:16px; border: 1px solid #e6e9ed;">{ecart_text}</td>
+                </tr>
+            </table>
+            """.format(
+                color_vol=color_score(note_vol), vol_text=f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A",
+                color_yield=color_score(note_yield), yield_text=f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A",
+                color_ecart=color_score(note_ecart), ecart_text=f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A"
+            ), unsafe_allow_html=True)
+            
+            st.markdown("""
+            <div style="font-size:11px; margin-top:15px; color: #555;">
+            <b style='text-decoration: underline;'>Légende :</b><br>
+            <span style="color:#28a745; font-weight:bold;">>4 : Risque très faible</span> &nbsp;&nbsp;&nbsp; 
+            <span style="color:#85c13f; font-weight:bold;">3-4 : Risque faible</span> &nbsp;&nbsp;&nbsp; 
+            <span style="color:#ffc107; font-weight:bold;">2-3 : Risque modéré</span><br>
+            <span style="color:#fd7e14; font-weight:bold;">1-2 : Risque élevé</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <span style="color:#dc3545; font-weight:bold;">0-1 : Risque très élevé</span>
+            </div>
+            """, unsafe_allow_html=True)
+        
+    with pres_col2:
+        st.markdown("<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>Evolution historique de la performance</div>", unsafe_allow_html=True)
+        fig_pres = go.Figure()
+        fig_pres.add_trace(go.Scatter(x=asset_prices.index, y=asset_prices, mode='lines', line=dict(color='#4c619b', width=2.5)))
+        fig_pres.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=200, plot_bgcolor='white', 
+                               xaxis=dict(showgrid=True, gridcolor='#f0f0f0', dtick="M24", tickformat="%b-%y"), 
+                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False))
+        st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
+        
+        perfs = [get_perf_ann(365*10), get_perf_ann(365*5), get_perf(365)]
+        vols = [get_vol(365*10), get_vol(365*5), get_vol(365)]
+        sharpes = [get_sharpe(365*10), get_sharpe(365*5), get_sharpe(365)]
+        drawdowns = [get_max_drawdown(365*10), get_max_drawdown(365*5), get_max_drawdown(365)]
+        
+        def fmt(v, pct=False):
+            if pd.isna(v): return "N/A"
+            if pct: return f"{v:.2f}%"
+            return f"{v:.2f}"
+        
+        ticker_disp = str(asset_info.get('ticker_bloomberg', 'Actif'))
+        if pd.isna(ticker_disp) or ticker_disp.strip() == 'nan': ticker_disp = 'Actif'
+        
+        st.markdown(f"""
+        <table style="width:100%; font-size:12px; text-align:center; margin-top: 15px; border-collapse: collapse;">
+            <tr>
+                <td style="border:none; width: 25%;"></td>
+                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">10 ans</th>
+                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">5 ans</th>
+                <th style="background-color:#003366; color:white; padding:6px; border: 1px solid white; width: 25%;">1 an</th>
+            </tr>
+            <tr>
+                <td style="border:none;"></td>
+                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+                <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white;">{ticker_disp}</td>
+            </tr>
+            <tr>
+                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Performance<br>annualisée</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[0], True)}</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[1], True)}</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(perfs[2], True)}</td>
+            </tr>
+            <tr>
+                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Volatilité<br>annualisée</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[0], True)}</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[1], True)}</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(vols[2], True)}</td>
+            </tr>
+            <tr>
+                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Sharpe Ratio</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[0])}</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[1])}</td>
+                <td style="padding:6px; border: 1px solid #e6e9ed;">{fmt(sharpes[2])}</td>
+            </tr>
+            <tr>
+                <td style="background-color:#e6e9ed; font-weight:bold; padding:6px; border: 1px solid white;">Max Drawdown</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[0], True)}</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[1], True)}</td>
+                <td style="background-color:#f4f5f7; padding:6px; border: 1px solid white;">{fmt(drawdowns[2], True)}</td>
+            </tr>
+        </table>
+        """, unsafe_allow_html=True)
 
     st.divider()
     st.subheader("Exporter le rapport Détaillé")
