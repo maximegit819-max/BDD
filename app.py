@@ -1211,6 +1211,8 @@ with tab_detail:
         ticker_disp = str(asset_info.get('ticker_bloomberg', 'Actif'))
         if pd.isna(ticker_disp) or ticker_disp.strip() == 'nan': ticker_disp = 'Actif'
         
+        main_color = '#4f81bd'
+        
         if benchmark_prices is not None:
             common_idx = asset_prices.index.intersection(benchmark_prices.index)
             if len(common_idx) > 0:
@@ -1219,19 +1221,24 @@ with tab_detail:
                 asset_b100 = (asset_sub / asset_sub.iloc[0]) * 100
                 bench_b100 = (bench_sub / bench_sub.iloc[0]) * 100
                 
-                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
-                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#ff9900', width=2.0)))
+                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
+                fig_pres.add_trace(go.Scatter(x=bench_b100.index, y=bench_b100, mode='lines', name=str(benchmark_name)[:20], line=dict(color='#e36c09', width=2.0)))
             else:
                 asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
-                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
+                fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
         else:
             asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
-            fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color='#003366', width=2.5)))
+            fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
             
-        fig_pres.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=200, plot_bgcolor='white', 
-                               xaxis=dict(showgrid=True, gridcolor='#f0f0f0', dtick="M6", tickformat="%b %y", title="Mois-Année"), 
-                               yaxis=dict(showgrid=True, gridcolor='#f0f0f0', zeroline=False, dtick=50, title="Cours"),
-                               legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)))
+        fig_pres.update_layout(
+            title=dict(text="Evolution historique de la performance de l'indice", font=dict(size=14, color='black', family='Arial', weight='bold'), x=0.5),
+            margin=dict(l=40, r=10, t=40, b=40), 
+            height=250, 
+            plot_bgcolor='white', 
+            xaxis=dict(showgrid=False, dtick="M12", tickformat="%b-%y", tickangle=-45, tickfont=dict(color='#595959')), 
+            yaxis=dict(showgrid=True, gridcolor='#d9d9d9', zeroline=False, dtick=50, tickformat=".2f", tickfont=dict(color='#595959')),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=10))
+        )
         st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
         
         perfs = [get_perf_ann(365*10), get_perf_ann(365*5), get_perf(365)]
