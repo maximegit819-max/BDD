@@ -775,6 +775,70 @@ with tab_detail:
         if var == 0: return np.nan
         return cov / var
 
+    # --- Scoring Décrément ---
+    def extract_decrement(name):
+        import re
+        m_pct = re.search(r'(\d+(?:[.,]\d+)?)\s*%', name)
+        if m_pct: return float(m_pct.group(1).replace(',', '.')), 'PERCENT'
+        m_dnp = re.search(r'(?i)d\s*(\d+(?:[.,]\d+)?)\s*p', name)
+        if m_dnp: return float(m_dnp.group(1).replace(',', '.')), 'POINTS'
+        m_dec = re.search(r'(?i)(?:decrement|decr\.?)\s*(\d+(?:[.,]\d+)?)', name)
+        if m_dec: return float(m_dec.group(1).replace(',', '.')), 'POINTS'
+        m_num = re.search(r'(?i)(\d+(?:[.,]\d+)?)\s*(?:points?|pts?|pt|point\(s\))?\s*decr', name)
+        if m_num: return float(m_num.group(1).replace(',', '.')), 'POINTS'
+        return None, None
+
+    asset_name_str = str(asset_info.get('name', ''))
+    dec_val, dec_type = extract_decrement(asset_name_str)
+    
+    if dec_val is not None:
+        import math
+        st.subheader("Scoring Nexo")
+        
+        # 1. Note Yield
+        note_yield = "N/A"
+        if pd.notna(current_price):
+            try:
+                note_yield = 5 / (1 + math.exp(0.02 * (850 - current_price)))
+            except: pass
+            
+        # 2. Note Volatilité
+        note_vol = "N/A"
+        vol_1y = get_vol(days=365)
+        vol_5y = get_vol(days=365*5)
+        if pd.notna(vol_1y) and pd.notna(vol_5y):
+            try:
+                avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
+                note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
+            except: pass
+            
+        # 3. Note Ecart
+        note_ecart = "N/A"
+        div_2025 = asset_info.get('dividend_yield')
+        if pd.notna(div_2025) and pd.notna(current_price) and current_price > 0:
+            try:
+                if dec_type == 'PERCENT':
+                    dec_yield = dec_val / 100.0
+                else:
+                    dec_yield = dec_val / current_price
+                ecart = float(div_2025) - dec_yield
+                note_ecart = 5 / (1 + math.exp(-150 * (ecart + 0.025)))
+            except: pass
+            
+        # Score Total
+        score_total = "N/A"
+        if note_yield != "N/A" and note_vol != "N/A" and note_ecart != "N/A":
+            score_total = note_yield + note_vol + note_ecart
+            
+        # Affichage
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.metric("Score Total (/15)", f"{score_total:.2f}" if score_total != "N/A" else "N/A")
+        sc2.metric("Note Yield (/5)", f"{note_yield:.2f}" if note_yield != "N/A" else "N/A")
+        sc3.metric("Note Ecart (/5)", f"{note_ecart:.2f}" if note_ecart != "N/A" else "N/A")
+        sc4.metric("Note Volatilité (/5)", f"{note_vol:.2f}" if note_vol != "N/A" else "N/A")
+        
+        st.divider()
+
     # --- 2. Tableaux Perf / Vol / Bêta ---
     st.subheader(f"Performances et Risques (Dernier cours : {current_price:.2f})")
 
