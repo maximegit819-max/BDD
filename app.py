@@ -274,6 +274,12 @@ def compute_screener_metrics(assets_df, prices_pivot):
     p_1y = prices_pivot.loc[dates_1y[-1]] if len(dates_1y) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
     perf_1y = ((last_prices / p_1y) - 1) * 100
 
+    dates_2y = prices_pivot.index[prices_pivot.index <= date_now - pd.Timedelta(days=365*2)]
+    p_2y = prices_pivot.loc[dates_2y[-1]] if len(dates_2y) > 0 else pd.Series(np.nan, index=prices_pivot.columns)
+    perf_2y = pd.Series(np.nan, index=prices_pivot.columns)
+    valid_mask = (p_2y > 0) & p_2y.notna() & last_prices.notna()
+    perf_2y[valid_mask] = ((last_prices[valid_mask] / p_2y[valid_mask]) ** (1/2) - 1) * 100
+
     # Volatilités annualisées (3 Mois et 1 An)
     daily_returns = prices_pivot.pct_change(fill_method=None)
     returns_3m = daily_returns.loc[daily_returns.index >= date_now - pd.Timedelta(days=90)]
@@ -300,6 +306,7 @@ def compute_screener_metrics(assets_df, prices_pivot):
         'perf_1m': perf_1m.values,
         'perf_ytd': perf_ytd.values,
         'perf_1y': perf_1y.values,
+        'perf_2y': perf_2y.values,
         'vol_3m': vol_3m.values,
         'vol_1y': vol_1y.values,
         'max_dd_1y': max_dd_1y.values,
@@ -394,6 +401,7 @@ with tab_screener:
         'perf_1m': 'Perf 1M (%)',
         'perf_ytd': 'Perf YTD (%)',
         'perf_1y': 'Perf 1A (%)',
+        'perf_2y': 'Perf 2A (%)',
         'vol_3m': 'Vol 3M (%)',
         'vol_1y': 'Vol 1A (%)',
         'max_dd_1y': 'Max DD 1A (%)',
@@ -440,6 +448,7 @@ with tab_screener:
         "Perf 1M (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Perf YTD (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Perf 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
+        "Perf 2A (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Vol 3M (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Vol 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
         "Max DD 1A (%)": st.column_config.NumberColumn(format="%.2f %%"),
