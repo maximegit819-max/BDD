@@ -1138,6 +1138,8 @@ with tab_detail:
     note_ecart = "N/A"
     dec_yield_pct = "N/A"
     div_2025 = asset_info.get('dividend_yield')
+    vol_1y = get_vol(days=365)
+    vol_5y = get_vol(days=365*5)
     if pd.notna(vol_1y) and pd.notna(vol_5y):
         try:
             avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
