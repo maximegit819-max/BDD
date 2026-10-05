@@ -897,7 +897,13 @@ with tab_detail:
         return None, None
 
     asset_name_str = str(asset_info.get('name', ''))
-    dec_val, dec_type = extract_decrement(asset_name_str)
+    asset_type_str = str(asset_info.get('asset_type', '')).strip().lower()
+    
+    # Ne calculer le décrément et le score Nexo QUE pour les indices
+    if asset_type_str == 'indice':
+        dec_val, dec_type = extract_decrement(asset_name_str)
+    else:
+        dec_val, dec_type = None, None
     
 
 
@@ -1132,19 +1138,16 @@ with tab_detail:
     note_ecart = "N/A"
     dec_yield_pct = "N/A"
     div_2025 = asset_info.get('dividend_yield')
-    
+    if pd.notna(vol_1y) and pd.notna(vol_5y):
+        try:
+            avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
+            note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
+        except: pass
+
     if dec_val is not None and pd.notna(current_price) and current_price > 0:
         try: note_yield = 5 / (1 + math.exp(0.02 * (850 - current_price)))
         except: pass
         
-        vol_1y = get_vol(days=365)
-        vol_5y = get_vol(days=365*5)
-        if pd.notna(vol_1y) and pd.notna(vol_5y):
-            try:
-                avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
-                note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
-            except: pass
-            
         if dec_type == 'PERCENT':
             dec_yield = dec_val / 100.0
             dec_yield_pct = dec_val
@@ -1195,8 +1198,7 @@ with tab_detail:
 </table>
         """, unsafe_allow_html=True)
         
-        if dec_val is not None:
-            st.markdown("""
+        st.markdown("""
 <table style="width:100%; font-family:sans-serif; font-size:13px; text-align:center; border-collapse: collapse; border: none;">
     <tr><th colspan="3" style="background-color:#003366; color:white; padding:8px; border: 1px solid white;">Score NEXO™</th></tr>
     <tr>
@@ -1210,22 +1212,22 @@ with tab_detail:
         <td style="padding:12px; font-weight:bold; color:{color_ecart}; background-color:white; font-size:16px; border: 1px solid #e6e9ed;">{ecart_text}</td>
     </tr>
 </table>
-            """.format(
-                color_vol=color_score(note_vol), vol_text=f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A",
-                color_yield=color_score(note_yield), yield_text=f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A",
-                color_ecart=color_score(note_ecart), ecart_text=f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A"
-            ), unsafe_allow_html=True)
-            
-            st.markdown("""
-            <div style="font-size:11px; margin-top:15px; color: #555;">
-            <b style='text-decoration: underline;'>Légende :</b><br>
-            <span style="color:#28a745; font-weight:bold;">>4 : Risque très faible</span> &nbsp;&nbsp;&nbsp; 
-            <span style="color:#85c13f; font-weight:bold;">3-4 : Risque faible</span> &nbsp;&nbsp;&nbsp; 
-            <span style="color:#ffc107; font-weight:bold;">2-3 : Risque modéré</span><br>
-            <span style="color:#fd7e14; font-weight:bold;">1-2 : Risque élevé</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <span style="color:#dc3545; font-weight:bold;">0-1 : Risque très élevé</span>
-            </div>
-            """, unsafe_allow_html=True)
+        """.format(
+            color_vol=color_score(note_vol), vol_text=f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A",
+            color_yield=color_score(note_yield), yield_text=f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A",
+            color_ecart=color_score(note_ecart), ecart_text=f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A"
+        ), unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="font-size:11px; margin-top:15px; color: #555;">
+        <b style='text-decoration: underline;'>Légende :</b><br>
+        <span style="color:#28a745; font-weight:bold;">>4 : Risque très faible</span> &nbsp;&nbsp;&nbsp; 
+        <span style="color:#85c13f; font-weight:bold;">3-4 : Risque faible</span> &nbsp;&nbsp;&nbsp; 
+        <span style="color:#ffc107; font-weight:bold;">2-3 : Risque modéré</span><br>
+        <span style="color:#fd7e14; font-weight:bold;">1-2 : Risque élevé</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        <span style="color:#dc3545; font-weight:bold;">0-1 : Risque très élevé</span>
+        </div>
+        """, unsafe_allow_html=True)
         
     with pres_col2:
         st.markdown("<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>Evolution historique de la performance (Base 100)</div>", unsafe_allow_html=True)
@@ -1440,14 +1442,11 @@ with tab_detail:
         else:
             left_data_list.append(["Taux de dividende 2025", f"{div_val_pct}"])
             
-        nexo_data_list = None
-        if dec_val is not None:
-            nexo_data_list = [
-                (f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A", color_score(note_vol)),
-                (f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A", color_score(note_yield)),
-                (f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A", color_score(note_ecart))
-            ]
-            
+        nexo_data_list = [
+            (f"{note_vol:.2f}/5" if note_vol!="N/A" else "N/A", color_score(note_vol)),
+            (f"{note_yield:.2f}/5" if note_yield!="N/A" else "N/A", color_score(note_yield)),
+            (f"{note_ecart:.2f}/5" if note_ecart!="N/A" else "N/A", color_score(note_ecart))
+        ]
         if benchmark_prices is not None:
             df_right = pd.DataFrame({
                 "C1": ["", "Performance annualisée", "Volatilité annualisée", "Sharpe Ratio", "Max Drawdown", "Corrélation"],
