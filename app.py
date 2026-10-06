@@ -903,9 +903,17 @@ with tab_detail:
 
     asset_name_str = str(asset_info.get('name', ''))
     asset_type_str = str(asset_info.get('asset_type', '')).strip().lower()
+    asset_subtype_str = str(asset_info.get('asset_subtype', '')).strip().lower()
     
-    # Ne calculer le décrément et le score Nexo QUE pour les indices
-    if asset_type_str == 'indice':
+    # Ne calculer le décrément et le score Nexo QUE pour les indices ou s'il s'agit explicitement d'un sous-type "décrément"
+    is_indice_or_decrement = (
+        'indice' in asset_type_str or 
+        'indice' in asset_subtype_str or 
+        'décrément' in asset_subtype_str or 
+        'decrement' in asset_subtype_str
+    )
+    
+    if is_indice_or_decrement:
         dec_val, dec_type = extract_decrement(asset_name_str)
     else:
         dec_val, dec_type = None, None
