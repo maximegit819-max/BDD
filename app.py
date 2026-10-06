@@ -187,10 +187,15 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
 
     try:
         if table_left:
-            for r, row_data in enumerate(left_data):
-                for c, val in enumerate(row_data):
-                    if r < len(table_left.rows) and c < len(table_left.columns):
-                        set_text(table_left.cell(r, c), val)
+            for r in range(len(table_left.rows)):
+                if r < len(left_data):
+                    row_data = left_data[r]
+                    for c, val in enumerate(row_data):
+                        if c < len(table_left.columns):
+                            set_text(table_left.cell(r, c), val)
+                else:
+                    for c in range(len(table_left.columns)):
+                        set_text(table_left.cell(r, c), "")
     except: pass
 
     if nexo_data and table_nexo:
@@ -1232,7 +1237,10 @@ with tab_detail:
         """, unsafe_allow_html=True)
         
     with pres_col2:
-        st.markdown("<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>Evolution historique de la performance (Base 100)</div>", unsafe_allow_html=True)
+        is_base_100 = (benchmark_prices is not None)
+        title_text = "Evolution historique de la performance (Base 100)" if is_base_100 else "Evolution historique du cours"
+        
+        st.markdown(f"<div style='text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px;'>{title_text}</div>", unsafe_allow_html=True)
         fig_pres = go.Figure()
         
         ticker_disp = str(asset_info.get('ticker_bloomberg', 'Actif'))
@@ -1240,7 +1248,7 @@ with tab_detail:
         
         main_color = '#4f81bd'
         
-        if benchmark_prices is not None:
+        if is_base_100:
             common_idx = asset_prices.index.intersection(benchmark_prices.index)
             if len(common_idx) > 0:
                 asset_sub = asset_prices.loc[common_idx]
@@ -1254,16 +1262,15 @@ with tab_detail:
                 asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
                 fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
         else:
-            asset_b100 = (asset_prices / asset_prices.iloc[0]) * 100
-            fig_pres.add_trace(go.Scatter(x=asset_b100.index, y=asset_b100, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
+            fig_pres.add_trace(go.Scatter(x=asset_prices.index, y=asset_prices, mode='lines', name=ticker_disp, line=dict(color=main_color, width=2.5)))
             
         fig_pres.update_layout(
-            title=dict(text="Evolution historique de la performance de l'indice", font=dict(size=14, color='black', family='Arial', weight='bold'), x=0.5),
+            title=dict(text=title_text, font=dict(size=14, color='black', family='Arial', weight='bold'), x=0.5),
             margin=dict(l=40, r=10, t=40, b=80), 
             height=280, 
             plot_bgcolor='white', 
             xaxis=dict(showgrid=False, dtick="M12", tickformat="%b-%y", tickangle=-45, tickfont=dict(color='#595959')), 
-            yaxis=dict(showgrid=True, gridcolor='#d9d9d9', zeroline=False, dtick=50, tickformat=".2f", tickfont=dict(color='#595959')),
+            yaxis=dict(showgrid=True, gridcolor='#d9d9d9', zeroline=False, dtick=50 if is_base_100 else None, tickformat=".2f", tickfont=dict(color='#595959')),
             legend=dict(orientation="h", yanchor="top", y=-0.35, xanchor="center", x=0.5, font=dict(size=10))
         )
         st.plotly_chart(fig_pres, use_container_width=True, config={'displayModeBar': False})
