@@ -41,7 +41,7 @@ def check_password():
     if st.session_state.get("password_correct", False):
         return True
 
-    st.title("🔒 Accès Sécurisé")
+    st.title("Accès Sécurisé")
     st.text_input(
         "Veuillez entrer le mot de passe pour accéder à l'univers d'investissement :", 
         type="password", 
@@ -49,7 +49,7 @@ def check_password():
         key="password"
     )
     if "password_correct" in st.session_state:
-        st.error("Mot de passe incorrect 😕")
+        st.error("Mot de passe incorrect.")
     return False
 
 if not check_password():
@@ -492,13 +492,6 @@ with tab_compare:
     )
     
     if len(selected_compare_names) > 0:
-        time_filter = st.radio(
-            "Période",
-            ["1 Mois", "3 Mois", "YTD", "1 An", "3 Ans", "5 Ans", "Max"],
-            index=6,
-            horizontal=True
-        )
-        
         selected_ids = [asset_options[name] for name in selected_compare_names]
         valid_ids = [aid for aid in selected_ids if aid in prices_pivot.columns]
         
@@ -506,25 +499,65 @@ with tab_compare:
             st.warning("Aucun historique de prix n'est disponible pour les actifs sélectionnés.")
         else:
             compare_prices = prices_pivot[valid_ids].dropna(how='all')
+            min_avail_date = compare_prices.index.min().date()
+            max_avail_date = compare_prices.index.max().date()
+
+            col_filter_choice, col_custom_dates = st.columns([3, 2])
+            with col_filter_choice:
+                time_filter = st.radio(
+                    "Période",
+                    ["1 Mois", "3 Mois", "YTD", "1 An", "3 Ans", "5 Ans", "Max", "Personnalisée"],
+                    index=6,
+                    horizontal=True,
+                    key="compare_time_filter"
+                )
             
             # Filtre temporel
             current_date = compare_prices.index.max()
             if time_filter == "1 Mois":
-                cutoff = current_date - pd.Timedelta(days=30)
+                cutoff_start = current_date - pd.Timedelta(days=30)
+                cutoff_end = current_date
             elif time_filter == "3 Mois":
-                cutoff = current_date - pd.Timedelta(days=90)
+                cutoff_start = current_date - pd.Timedelta(days=90)
+                cutoff_end = current_date
             elif time_filter == "YTD":
-                cutoff = pd.Timestamp(year=current_date.year - 1, month=12, day=31)
+                cutoff_start = pd.Timestamp(year=current_date.year - 1, month=12, day=31)
+                cutoff_end = current_date
             elif time_filter == "1 An":
-                cutoff = current_date - pd.Timedelta(days=365)
+                cutoff_start = current_date - pd.Timedelta(days=365)
+                cutoff_end = current_date
             elif time_filter == "3 Ans":
-                cutoff = current_date - pd.Timedelta(days=365*3)
+                cutoff_start = current_date - pd.Timedelta(days=365*3)
+                cutoff_end = current_date
             elif time_filter == "5 Ans":
-                cutoff = current_date - pd.Timedelta(days=365*5)
-            else: # Max
-                cutoff = compare_prices.index.min()
+                cutoff_start = current_date - pd.Timedelta(days=365*5)
+                cutoff_end = current_date
+            elif time_filter == "Max":
+                cutoff_start = compare_prices.index.min()
+                cutoff_end = current_date
+            else:  # "Personnalisée"
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    default_start = max(min_avail_date, (max_avail_date - pd.Timedelta(days=365).to_pytimedelta()))
+                    custom_start = st.date_input(
+                        "Date de début :",
+                        value=default_start,
+                        min_value=min_avail_date,
+                        max_value=max_avail_date,
+                        key="compare_custom_start"
+                    )
+                with col_d2:
+                    custom_end = st.date_input(
+                        "Date de fin :",
+                        value=max_avail_date,
+                        min_value=min_avail_date,
+                        max_value=max_avail_date,
+                        key="compare_custom_end"
+                    )
+                cutoff_start = pd.to_datetime(custom_start)
+                cutoff_end = pd.to_datetime(custom_end)
                 
-            compare_prices = compare_prices[compare_prices.index >= cutoff]
+            compare_prices = compare_prices[(compare_prices.index >= cutoff_start) & (compare_prices.index <= cutoff_end)]
             
             # Trouver la date de départ commune (max des dates de début individuelles)
             start_dates = compare_prices.apply(lambda x: x.first_valid_index())
@@ -533,6 +566,9 @@ with tab_compare:
             if pd.isna(common_start_date):
                 st.warning("Aucune période commune trouvée entre ces actifs pour la période sélectionnée.")
             else:
+                if common_start_date > cutoff_start:
+                    st.info(f"Point de départ commun calé au {common_start_date.strftime('%d/%m/%Y')} (première date où tous les actifs sélectionnés cotent ensemble).")
+
                 # Filtrer depuis la date de départ commune
                 compare_prices_common = compare_prices[compare_prices.index >= common_start_date]
                 
@@ -605,11 +641,34 @@ with tab_compare:
                 st.plotly_chart(fig_vol_comp, use_container_width=True)
 
                 # --- Panier équipondéré ---
+                fig_basket_bench_corr = None
                 if len(valid_ids) > 1:
                     st.divider()
                     st.subheader("Performance du Panier Équipondéré")
                     st.markdown("Évolution d'un portefeuille théorique investi à parts égales sur les actifs sélectionnés à la date de départ (sans rebalancement).")
                     
+                    # Sélection du benchmark parmi tous les indices disponibles
+                    index_mask = (
+                        (assets_df['asset_type'].astype(str).str.lower() == 'indice') |
+                        (assets_df['asset_subtype'].astype(str).str.lower().str.contains('indice', na=False)) |
+                        (assets_df['ticker_bloomberg'].astype(str).str.upper().str.endswith('INDEX'))
+                    )
+                    bench_df = assets_df[index_mask & assets_df['asset_id'].isin(prices_pivot.columns)]
+                    bench_df = bench_df.drop_duplicates(subset=['asset_id']).sort_values(by='name')
+                    
+                    bench_options = {"(Aucun Benchmark)": None}
+                    for _, r in bench_df.iterrows():
+                        label = f"{r['name']} ({r['ticker_bloomberg']})" if pd.notna(r['ticker_bloomberg']) else r['name']
+                        bench_options[label] = r['asset_id']
+                    
+                    selected_bench_name = st.selectbox(
+                        "Comparer le Panier avec un Benchmark (Indice) :",
+                        options=list(bench_options.keys()),
+                        index=0,
+                        key="basket_bench_select"
+                    )
+                    selected_bench_id = bench_options[selected_bench_name]
+
                     basket_prices = base_100_prices.mean(axis=1)
                     
                     fig_basket = go.Figure()
@@ -621,9 +680,25 @@ with tab_compare:
                         line=dict(width=3, color='#FF9900')
                     ))
                     
+                    bench_series_sub = None
+                    if selected_bench_id is not None:
+                        bench_raw = prices_pivot[selected_bench_id].dropna()
+                        bench_sub = bench_raw[(bench_raw.index >= common_start_date) & (bench_raw.index <= compare_prices_common.index.max())]
+                        
+                        if len(bench_sub) > 0:
+                            bench_base_100 = (bench_sub / bench_sub.iloc[0]) * 100
+                            bench_series_sub = bench_sub
+                            fig_basket.add_trace(go.Scatter(
+                                x=bench_base_100.index,
+                                y=bench_base_100,
+                                mode='lines',
+                                name=f"Benchmark ({selected_bench_name})",
+                                line=dict(width=2, color='#00d2ff', dash='dash')
+                            ))
+                    
                     fig_basket.update_layout(
                         hovermode="x unified",
-                        height=400,
+                        height=420,
                         margin=dict(l=0, r=0, t=30, b=0),
                         yaxis_title="Base 100",
                         showlegend=True,
@@ -639,9 +714,68 @@ with tab_compare:
                     st.plotly_chart(fig_basket, use_container_width=True)
                     
                     basket_perf = basket_prices.iloc[-1] - 100
-                    st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
+                    if selected_bench_id is not None and bench_series_sub is not None and len(bench_series_sub) > 0:
+                        bench_perf = (bench_series_sub.iloc[-1] / bench_series_sub.iloc[0] - 1) * 100
+                        spread_perf = basket_perf - bench_perf
+                        col_bp1, col_bp2, col_bp3 = st.columns(3)
+                        col_bp1.metric("Performance Panier", f"{basket_perf:+.2f} %")
+                        col_bp2.metric("Performance Benchmark", f"{bench_perf:+.2f} %")
+                        col_bp3.metric("Sur / Sous-Performance", f"{spread_perf:+.2f} %", delta=f"{spread_perf:+.2f} %")
+                    else:
+                        st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
 
-                    # --- Corrélation Glissante ---
+                    # --- Corrélation Rolling 1 An : Panier vs Benchmark ---
+                    if selected_bench_id is not None and bench_series_sub is not None and len(bench_series_sub) > 0:
+                        st.subheader("Corrélation Rolling 1 An : Panier vs Benchmark")
+                        st.markdown(f"Évolution de la corrélation glissante des rendements quotidiens sur 1 an (252 jours) entre le Panier Équipondéré et **{selected_bench_name}**.")
+                        
+                        basket_ret = basket_prices.pct_change(fill_method=None).dropna()
+                        bench_ret = bench_series_sub.pct_change(fill_method=None).dropna()
+                        comb_ret = pd.DataFrame({'Panier': basket_ret, 'Benchmark': bench_ret}).dropna()
+                        
+                        if len(comb_ret) >= 30:
+                            min_periods_corr = 252 if len(comb_ret) >= 252 else max(20, len(comb_ret) // 2)
+                            roll_corr_bb = comb_ret['Panier'].rolling(window=252, min_periods=min_periods_corr).corr(comb_ret['Benchmark'])
+                            
+                            fig_basket_bench_corr = go.Figure()
+                            # Ligne horizontale de référence à 0
+                            fig_basket_bench_corr.add_hline(
+                                y=0, line_dash="dash", line_color="rgba(128, 128, 128, 0.4)", line_width=1
+                            )
+                            fig_basket_bench_corr.add_trace(go.Scatter(
+                                x=roll_corr_bb.index,
+                                y=roll_corr_bb,
+                                mode='lines',
+                                name=f"Corrélation Panier vs Benchmark",
+                                line=dict(width=2, color='#00d2ff')
+                            ))
+                            
+                            fig_basket_bench_corr.update_layout(
+                                hovermode="x unified",
+                                height=380,
+                                margin=dict(l=0, r=0, t=30, b=0),
+                                yaxis_title="Corrélation",
+                                yaxis=dict(range=[-1.05, 1.05]),
+                                showlegend=True,
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="top",
+                                    y=-0.1,
+                                    xanchor="center",
+                                    x=0.5
+                                )
+                            )
+                            st.plotly_chart(fig_basket_bench_corr, use_container_width=True)
+                            
+                            valid_corrs = roll_corr_bb.dropna()
+                            if not valid_corrs.empty:
+                                c_c1, c_c2 = st.columns(2)
+                                c_c1.metric("Dernière Corrélation Glissante (1 An)", f"{valid_corrs.iloc[-1]:.2f}")
+                                c_c2.metric("Corrélation Moyenne sur la Période", f"{valid_corrs.mean():.2f}")
+                        else:
+                            st.info("Données insuffisantes sur la période pour calculer la corrélation glissante (minimum 30 jours requis).")
+
+                    # --- Corrélation Glissante Croisée ---
                     st.divider()
                     st.subheader("Corrélation Croisée (1 An Glissant)")
                     st.markdown("Évolution de la corrélation des rendements quotidiens entre les actifs sur une fenêtre glissante de 1 an (252 jours).")
@@ -689,6 +823,8 @@ with tab_compare:
                             figs_export = {"Base 100": fig, "Volatilité": fig_vol_comp}
                             if len(valid_ids) > 1:
                                 figs_export["Panier Équipondéré"] = fig_basket
+                                if fig_basket_bench_corr is not None:
+                                    figs_export["Corrélation Panier vs Benchmark"] = fig_basket_bench_corr
                                 figs_export["Corrélations Croisées"] = fig_corr
                                 
                             st.session_state["compare_exports"] = {
@@ -1487,7 +1623,7 @@ with tab_detail:
         pptx_buffer = create_nexo_presentation_pptx(asset_name_str, desc, left_data_list, nexo_data_list, df_right, fig_pres, template_name=tmpl)
         
     st.download_button(
-        label="📥 Télécharger ce Slide en PPTX natif",
+        label="Télécharger ce Slide en PPTX natif",
         data=pptx_buffer,
         file_name=f"Presentation_Client_{selected_asset_name}.pptx",
         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
