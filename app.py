@@ -200,6 +200,8 @@ def create_nexo_presentation_pptx(asset_name, desc, left_data, nexo_data, right_
 
     if nexo_data and table_nexo:
         try:
+            if len(table_nexo.rows) > 1 and len(table_nexo.columns) >= 2:
+                set_text(table_nexo.cell(1, 1), "Poids du Décrément")
             for c, item in enumerate(nexo_data):
                 val, color_hex = item
                 if c < len(table_nexo.columns):
@@ -1381,7 +1383,7 @@ with tab_detail:
     <tr><th colspan="3" style="background-color:#003366; color:white; padding:8px; border: 1px solid white;">Score NEXO™</th></tr>
     <tr>
         <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Volatilité</td>
-        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Dividende</td>
+        <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Poids du Décrément</td>
         <td style="background-color:#1c4b78; color:white; padding:6px; border: 1px solid white; width: 33%;">Ecart</td>
     </tr>
     <tr>
