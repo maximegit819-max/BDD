@@ -1280,37 +1280,64 @@ with tab_detail:
         if score >= 1: return "#fd7e14"
         return "#dc3545"
 
-    # Notes S-Curve (Uniquement si décrément)
+    # Notes NEXO (Formules calibrées - Documentation Méthodologique)
     import math
     note_yield = "N/A"
     note_vol = "N/A"
     note_ecart = "N/A"
     dec_yield_pct = "N/A"
     div_2025 = asset_info.get('dividend_yield')
-    vol_1y = get_vol(days=365)
-    vol_5y = get_vol(days=365*5)
-    if pd.notna(vol_1y) and pd.notna(vol_5y):
-        try:
-            avg_vol = ((vol_1y / 100.0) + (vol_5y / 100.0)) / 2.0
-            note_vol = 5 / (1 + math.exp(44 * (avg_vol - 0.26)))
-        except: pass
 
+    # 1. Note Volatilité (basée sur la vol annualisée 1 an)
+    vol_1y = get_vol(days=365)
+    if pd.notna(vol_1y):
+        try:
+            x_vol = float(vol_1y)
+            if x_vol <= 18.0:
+                note_vol = 5.0
+            elif x_vol >= 40.0:
+                note_vol = 0.0
+            else:
+                val = -4.45 + 17.50 * math.exp(-0.0343 * x_vol)
+                note_vol = max(0.0, min(5.0, val))
+        except Exception:
+            pass
+
+    # 2. Note Yield & Note Écart (si décrément)
     if dec_val is not None and pd.notna(current_price) and current_price > 0:
-        try: note_yield = 5 / (1 + math.exp(0.02 * (850 - current_price)))
-        except: pass
-        
         if dec_type == 'PERCENT':
-            dec_yield = dec_val / 100.0
-            dec_yield_pct = dec_val
+            dec_yield = float(dec_val) / 100.0
+            dec_yield_pct = float(dec_val)
         else:
-            dec_yield = dec_val / current_price
-            dec_yield_pct = dec_yield * 100
-            
+            dec_yield = float(dec_val) / float(current_price)
+            dec_yield_pct = dec_yield * 100.0
+
+        # Note Yield : fittée sur le poids du décrément en %
+        try:
+            x_yield = float(dec_yield_pct)
+            if x_yield <= 4.0:
+                note_yield = 5.0
+            elif x_yield >= 8.0:
+                note_yield = 0.0
+            else:
+                val = 5.94 - 0.15 * math.exp(0.46 * x_yield)
+                note_yield = max(0.0, min(5.0, val))
+        except Exception:
+            pass
+
+        # Note Écart : fittée sur l'écart de dividende en %
         if pd.notna(div_2025):
             try:
-                ecart = float(div_2025) - dec_yield
-                note_ecart = 5 / (1 + math.exp(-150 * (ecart + 0.025)))
-            except: pass
+                x_ecart = (float(div_2025) - dec_yield) * 100.0
+                if x_ecart >= 1.0:
+                    note_ecart = 5.0
+                elif x_ecart <= -5.0:
+                    note_ecart = 0.0
+                else:
+                    val = 6.44 - 1.85 * math.exp(-0.25 * x_ecart)
+                    note_ecart = max(0.0, min(5.0, val))
+            except Exception:
+                pass
 
     pres_col1, pres_col2 = st.columns([1, 1], gap="large")
     
