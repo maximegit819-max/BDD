@@ -1319,10 +1319,10 @@ with tab_detail:
             x_yield = float(dec_yield_pct)
             if x_yield <= 4.0:
                 note_yield = 5.0
-            elif x_yield >= 8.0:
+            elif x_yield >= 7.5:
                 note_yield = 0.0
             else:
-                val = 5.94 - 0.15 * math.exp(0.46 * x_yield)
+                val = 5.42 - 0.0227 * math.exp(0.73 * x_yield)
                 note_yield = max(0.0, min(5.0, val))
         except Exception:
             pass
@@ -1333,10 +1333,10 @@ with tab_detail:
                 x_ecart = (float(div_2025) - dec_yield) * 100.0
                 if x_ecart >= 1.0:
                     note_ecart = 5.0
-                elif x_ecart <= -5.0:
+                elif x_ecart <= -5.5:
                     note_ecart = 0.0
                 else:
-                    val = 6.44 - 1.85 * math.exp(-0.25 * x_ecart)
+                    val = 6.17 - 1.51 * math.exp(-0.26 * x_ecart)
                     note_ecart = max(0.0, min(5.0, val))
             except Exception:
                 pass
