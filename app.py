@@ -719,10 +719,22 @@ with tab_compare:
                     if selected_bench_id is not None and bench_series_sub is not None and len(bench_series_sub) > 0:
                         bench_perf = (bench_series_sub.iloc[-1] / bench_series_sub.iloc[0] - 1) * 100
                         spread_perf = basket_perf - bench_perf
-                        col_bp1, col_bp2, col_bp3 = st.columns(3)
+                        
+                        # Calcul du Bêta du Panier vs Benchmark sur la période
+                        basket_ret = basket_prices.pct_change(fill_method=None).dropna()
+                        bench_ret = bench_series_sub.pct_change(fill_method=None).dropna()
+                        comb_ret = pd.DataFrame({'Panier': basket_ret, 'Benchmark': bench_ret}).dropna()
+                        
+                        if len(comb_ret) >= 5 and comb_ret['Benchmark'].var() > 0:
+                            basket_beta = comb_ret['Panier'].cov(comb_ret['Benchmark']) / comb_ret['Benchmark'].var()
+                            beta_disp = f"{basket_beta:.2f}"
+                        else:
+                            beta_disp = "N/A"
+                        col_bp1, col_bp2, col_bp3, col_bp4 = st.columns(4)
                         col_bp1.metric("Performance Panier", f"{basket_perf:+.2f} %")
                         col_bp2.metric("Performance Benchmark", f"{bench_perf:+.2f} %")
                         col_bp3.metric("Sur / Sous-Performance", f"{spread_perf:+.2f} %", delta=f"{spread_perf:+.2f} %")
+                        col_bp4.metric("Bêta du Panier (vs Benchmark)", beta_disp)
                     else:
                         st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
 
