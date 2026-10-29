@@ -644,6 +644,7 @@ with tab_compare:
 
                 # --- Panier équipondéré ---
                 fig_basket_bench_corr = None
+                df_comp = None
                 if len(valid_ids) > 1:
                     st.divider()
                     st.subheader("Performance du Panier Équipondéré")
@@ -730,11 +731,52 @@ with tab_compare:
                             beta_disp = f"{basket_beta:.2f}"
                         else:
                             beta_disp = "N/A"
-                        col_bp1, col_bp2, col_bp3, col_bp4 = st.columns(4)
-                        col_bp1.metric("Performance Panier", f"{basket_perf:+.2f} %")
-                        col_bp2.metric("Performance Benchmark", f"{bench_perf:+.2f} %")
-                        col_bp3.metric("Sur / Sous-Performance", f"{spread_perf:+.2f} %", delta=f"{spread_perf:+.2f} %")
-                        col_bp4.metric("Bêta du Panier (vs Benchmark)", beta_disp)
+                        # Volatilité Historique Annualisée
+                        basket_vol = basket_ret.std(ddof=1) * np.sqrt(252) * 100 if len(basket_ret) > 1 else np.nan
+                        bench_vol = bench_ret.std(ddof=1) * np.sqrt(252) * 100 if len(bench_ret) > 1 else np.nan
+                        spread_vol = basket_vol - bench_vol if pd.notna(basket_vol) and pd.notna(bench_vol) else np.nan
+                        
+                        # Max Drawdown
+                        cummax_basket = basket_prices.cummax()
+                        dd_basket = (basket_prices - cummax_basket) / cummax_basket
+                        basket_mdd = dd_basket.min() * 100
+                        
+                        cummax_bench = bench_series_sub.cummax()
+                        dd_bench = (bench_series_sub - cummax_bench) / cummax_bench
+                        bench_mdd = dd_bench.min() * 100
+                        spread_mdd = basket_mdd - bench_mdd
+
+                        # Bêta affiché en dehors du tableau
+                        col_beta_box, _ = st.columns([1, 2])
+                        with col_beta_box:
+                            st.metric("Bêta du Panier (vs Benchmark)", beta_disp)
+
+                        # Tableau comparatif
+                        bench_col_title = f"Benchmark ({selected_bench_name})"
+                        comp_data = {
+                            "Métrique": [
+                                "Performance Globale",
+                                "Volatilité Historique (ann.)",
+                                "Max Drawdown"
+                            ],
+                            "Panier Équipondéré": [
+                                f"{basket_perf:+.2f} %",
+                                f"{basket_vol:.2f} %" if pd.notna(basket_vol) else "N/A",
+                                f"{basket_mdd:.2f} %" if pd.notna(basket_mdd) else "N/A"
+                            ],
+                            bench_col_title: [
+                                f"{bench_perf:+.2f} %",
+                                f"{bench_vol:.2f} %" if pd.notna(bench_vol) else "N/A",
+                                f"{bench_mdd:.2f} %" if pd.notna(bench_mdd) else "N/A"
+                            ],
+                            "Écart": [
+                                f"{spread_perf:+.2f} %",
+                                f"{spread_vol:+.2f} %" if pd.notna(spread_vol) else "N/A",
+                                f"{spread_mdd:+.2f} %" if pd.notna(spread_mdd) else "N/A"
+                            ]
+                        }
+                        df_comp = pd.DataFrame(comp_data)
+                        st.dataframe(df_comp, hide_index=True, use_container_width=True)
                     else:
                         st.metric(label="Performance globale du Panier", value=f"{basket_perf:+.2f} %")
 
@@ -836,6 +878,8 @@ with tab_compare:
                             dfs_export = {"Performance": perf_df}
                             figs_export = {"Base 100": fig, "Volatilité": fig_vol_comp}
                             if len(valid_ids) > 1:
+                                if df_comp is not None:
+                                    dfs_export["Panier vs Benchmark"] = df_comp
                                 figs_export["Panier Équipondéré"] = fig_basket
                                 if fig_basket_bench_corr is not None:
                                     figs_export["Corrélation Panier vs Benchmark"] = fig_basket_bench_corr
